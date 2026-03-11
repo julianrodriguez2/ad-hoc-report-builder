@@ -1,0 +1,7 @@
+<p-panel header="Template Selector">
+  <div class="template-grid">
+    @for (template of templates; track template) {
+      <button pButton type="button" [label]="template" size="small" class="template-button"></button>
+    }
+  </div>
+</p-panel>

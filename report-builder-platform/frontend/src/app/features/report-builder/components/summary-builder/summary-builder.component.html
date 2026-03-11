@@ -1,0 +1,10 @@
+<p-panel header="Summary Builder">
+  <div class="summary-list">
+    @for (summary of summaries; track summary.fieldName + summary.operation) {
+      <div class="summary-item">
+        <span>{{ summary.operation | uppercase }}</span>
+        <strong>{{ summary.fieldName }}</strong>
+      </div>
+    }
+  </div>
+</p-panel>

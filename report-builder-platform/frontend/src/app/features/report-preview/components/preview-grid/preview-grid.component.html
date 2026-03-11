@@ -1,0 +1,18 @@
+<p-panel header="Preview Grid">
+  <p-table [value]="rows" [tableStyle]="{ 'min-width': '100%' }" size="small">
+    <ng-template pTemplate="header">
+      <tr>
+        @for (column of columns; track column) {
+          <th>{{ column }}</th>
+        }
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-row>
+      <tr>
+        @for (column of columns; track column) {
+          <td>{{ row[column] }}</td>
+        }
+      </tr>
+    </ng-template>
+  </p-table>
+</p-panel>

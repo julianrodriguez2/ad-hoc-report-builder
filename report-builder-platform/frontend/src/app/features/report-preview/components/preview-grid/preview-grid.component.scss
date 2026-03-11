@@ -1,0 +1,16 @@
+:host {
+  display: block;
+}
+
+:host ::ng-deep .p-panel {
+  height: 100%;
+}
+
+:host ::ng-deep .p-panel .p-panel-content {
+  height: calc(100% - 3rem);
+  display: flex;
+}
+
+:host ::ng-deep .p-table {
+  width: 100%;
+}

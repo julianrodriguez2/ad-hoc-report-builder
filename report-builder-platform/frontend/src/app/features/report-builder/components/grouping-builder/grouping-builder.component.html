@@ -1,0 +1,10 @@
+<p-panel header="Grouping Builder">
+  <ul class="group-list">
+    @for (group of groups; track group.fieldName) {
+      <li>
+        <span>{{ group.fieldName }}</span>
+        <small>{{ group.direction }}</small>
+      </li>
+    }
+  </ul>
+</p-panel>

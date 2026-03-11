@@ -1,0 +1,15 @@
+.group-list {
+  margin: 0;
+  padding-left: 1rem;
+}
+
+.group-list li {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+
+.group-list small {
+  color: #64748b;
+  text-transform: uppercase;
+}

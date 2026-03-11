@@ -1,0 +1,33 @@
+.report-builder-page {
+  height: 100vh;
+  padding: 1rem;
+}
+
+:host ::ng-deep .full-height-splitter {
+  height: calc(100vh - 2rem);
+  border: 1px solid #d8e1ee;
+  border-radius: 10px;
+}
+
+.left-panel,
+.right-panel,
+.center-panel {
+  height: 100%;
+  overflow: auto;
+  padding: 0.75rem;
+}
+
+.center-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 1024px) {
+  .report-builder-page {
+    height: auto;
+  }
+
+  :host ::ng-deep .full-height-splitter {
+    height: auto;
+  }
+}

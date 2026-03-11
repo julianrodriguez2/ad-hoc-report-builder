@@ -1,0 +1,26 @@
+<section class="report-builder-page">
+  <p-splitter [panelSizes]="[26, 48, 26]" [minSizes]="[20, 30, 20]" styleClass="full-height-splitter">
+    <ng-template pTemplate>
+      <div class="panel-stack left-panel">
+        <app-dataset-selector></app-dataset-selector>
+        <app-field-selector></app-field-selector>
+        <app-filter-builder></app-filter-builder>
+        <app-grouping-builder></app-grouping-builder>
+        <app-summary-builder></app-summary-builder>
+      </div>
+    </ng-template>
+
+    <ng-template pTemplate>
+      <div class="center-panel">
+        <app-preview-grid></app-preview-grid>
+      </div>
+    </ng-template>
+
+    <ng-template pTemplate>
+      <div class="panel-stack right-panel">
+        <app-layout-editor></app-layout-editor>
+        <app-template-selector></app-template-selector>
+      </div>
+    </ng-template>
+  </p-splitter>
+</section>

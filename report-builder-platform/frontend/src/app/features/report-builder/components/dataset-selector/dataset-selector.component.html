@@ -1,0 +1,10 @@
+<p-panel header="Dataset Selector">
+  <p-dropdown
+    [options]="datasets"
+    [(ngModel)]="selectedDatasetId"
+    optionLabel="name"
+    optionValue="id"
+    [style]="{ width: '100%' }"
+    placeholder="Select a dataset"
+  ></p-dropdown>
+</p-panel>

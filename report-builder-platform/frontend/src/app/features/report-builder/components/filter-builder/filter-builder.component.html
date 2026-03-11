@@ -1,0 +1,10 @@
+<p-panel header="Filter Builder">
+  <div class="filter-list">
+    @for (filter of filters; track filter.fieldName + filter.operator) {
+      <div class="filter-item">
+        <strong>{{ filter.fieldName }}</strong>
+        <span>{{ filter.operator }}</span>
+      </div>
+    }
+  </div>
+</p-panel>

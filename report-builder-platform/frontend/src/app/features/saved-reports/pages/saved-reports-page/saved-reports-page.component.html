@@ -1,0 +1,22 @@
+<section class="saved-reports-page">
+  <p-card header="Saved Reports">
+    <p-table [value]="reports" [tableStyle]="{ 'min-width': '36rem' }" size="small">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Created By</th>
+          <th>Created At</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-report>
+        <tr>
+          <td>{{ report.id }}</td>
+          <td>{{ report.name }}</td>
+          <td>{{ report.createdBy }}</td>
+          <td>{{ report.createdAt }}</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </p-card>
+</section>
