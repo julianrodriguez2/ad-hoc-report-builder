@@ -1,6 +1,7 @@
 export interface Dataset {
-  id: number;
+  id: string;
   name: string;
   description: string;
-  viewName: string;
+  viewName?: string;
+  createdAt?: string;
 }

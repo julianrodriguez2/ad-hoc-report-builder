@@ -10,14 +10,25 @@ public class DatasetRepository(AppDbContext dbContext) : IDatasetRepository
 
     public async Task<IReadOnlyList<Dataset>> GetDatasetsAsync(CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Datasets.AsNoTracking().ToListAsync(cancellationToken);
+        return await _dbContext.Datasets
+            .AsNoTracking()
+            .OrderBy(dataset => dataset.Name)
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<DatasetField>> GetDatasetFieldsAsync(int datasetId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<DatasetField>> GetDatasetFieldsAsync(Guid datasetId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.DatasetFields
             .AsNoTracking()
             .Where(field => field.DatasetId == datasetId)
+            .OrderBy(field => field.DisplayName)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> DatasetExistsAsync(Guid datasetId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Datasets
+            .AsNoTracking()
+            .AnyAsync(dataset => dataset.Id == datasetId, cancellationToken);
     }
 }

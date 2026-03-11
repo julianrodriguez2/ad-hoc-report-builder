@@ -1,10 +1,10 @@
 export interface Field {
-  id: number;
-  datasetId: number;
+  id: string;
+  datasetId?: string;
   fieldName: string;
   displayName: string;
   dataType: string;
-  isFilterable: boolean;
-  isGroupable: boolean;
-  isSummarizable: boolean;
+  isFilterable?: boolean;
+  isGroupable?: boolean;
+  isSummarizable?: boolean;
 }

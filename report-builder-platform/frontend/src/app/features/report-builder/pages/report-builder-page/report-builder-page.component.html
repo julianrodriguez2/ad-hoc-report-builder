@@ -2,8 +2,36 @@
   <p-splitter [panelSizes]="[26, 48, 26]" [minSizes]="[20, 30, 20]" styleClass="full-height-splitter">
     <ng-template pTemplate>
       <div class="panel-stack left-panel">
-        <app-dataset-selector></app-dataset-selector>
-        <app-field-selector></app-field-selector>
+        <p-panel header="Dataset Selector">
+          <p-dropdown
+            [options]="datasets"
+            [(ngModel)]="selectedDatasetId"
+            optionLabel="name"
+            optionValue="id"
+            [showClear]="true"
+            [style]="{ width: '100%' }"
+            placeholder="Select a dataset"
+            (onChange)="onDatasetChange($event.value ?? null)"
+          ></p-dropdown>
+          @if (isDatasetsLoading) {
+            <p class="status-message">Loading datasets...</p>
+          }
+          @if (datasetsLoadError) {
+            <p class="status-message error">{{ datasetsLoadError }}</p>
+          }
+        </p-panel>
+
+        <app-field-selector
+          [availableFields]="availableFields"
+          [selectedFieldNames]="reportDefinition.fields"
+          (selectedFieldNamesChange)="onSelectedFieldsChanged($event)"
+        ></app-field-selector>
+        @if (isFieldsLoading) {
+          <p class="status-message">Loading fields...</p>
+        }
+        @if (fieldsLoadError) {
+          <p class="status-message error">{{ fieldsLoadError }}</p>
+        }
         <app-filter-builder></app-filter-builder>
         <app-grouping-builder></app-grouping-builder>
         <app-summary-builder></app-summary-builder>

@@ -1,28 +1,25 @@
-.field-help {
-  margin: 0 0 0.75rem;
-  font-size: 0.85rem;
-  color: #64748b;
-}
-
 .field-list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.45rem;
 }
 
 .field-item {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  display: flex;
   align-items: center;
   gap: 0.5rem;
   border: 1px solid #d8e1ee;
   border-radius: 6px;
   padding: 0.5rem;
   background: #ffffff;
-  cursor: move;
+  cursor: pointer;
 }
 
-.field-item small {
+.field-item input {
+  margin: 0;
+}
+
+.empty-state {
+  margin: 0;
   color: #64748b;
-  text-transform: uppercase;
 }

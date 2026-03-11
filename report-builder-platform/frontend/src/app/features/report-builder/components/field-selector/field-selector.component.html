@@ -1,12 +1,19 @@
-<p-panel header="Field Selector">
-  <p class="field-help">Drag selected fields to set output order.</p>
-  <div class="field-list" cdkDropList (cdkDropListDropped)="drop($event)">
-    @for (field of fields; track field.fieldName) {
-      <div class="field-item" cdkDrag>
-        <i class="pi pi-bars"></i>
-        <span>{{ field.displayName }}</span>
-        <small>{{ field.dataType }}</small>
-      </div>
-    }
-  </div>
+<p-panel header="Available Fields">
+  @if (availableFields.length === 0) {
+    <p class="empty-state">Select a dataset to load fields.</p>
+  } @else {
+    <div class="field-list">
+      @for (field of availableFields; track field.id) {
+        <label class="field-item" [for]="field.id">
+          <input
+            type="checkbox"
+            [id]="field.id"
+            [checked]="isSelected(field.fieldName)"
+            (change)="onFieldToggled(field.fieldName, $event)"
+          />
+          <span>{{ field.displayName }}</span>
+        </label>
+      }
+    </div>
+  }
 </p-panel>

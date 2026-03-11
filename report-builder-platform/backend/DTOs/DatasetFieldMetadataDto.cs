@@ -1,10 +1,8 @@
-namespace backend.Models;
+namespace backend.DTOs;
 
-public class DatasetField
+public class DatasetFieldMetadataDto
 {
     public Guid Id { get; set; }
-
-    public Guid DatasetId { get; set; }
 
     public string FieldName { get; set; } = string.Empty;
 
@@ -17,6 +15,4 @@ public class DatasetField
     public bool IsGroupable { get; set; }
 
     public bool IsSummarizable { get; set; }
-
-    public Dataset? Dataset { get; set; }
 }

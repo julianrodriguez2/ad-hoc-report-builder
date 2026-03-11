@@ -20,15 +20,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
             entity.Property(x => x.Description).HasMaxLength(1000).IsRequired();
             entity.Property(x => x.ViewName).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.CreatedAt).IsRequired();
         });
 
         modelBuilder.Entity<DatasetField>(entity =>
         {
-            entity.ToTable("DatasetFields");
+            entity.ToTable("Fields");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.FieldName).HasMaxLength(200).IsRequired();
             entity.Property(x => x.DisplayName).HasMaxLength(200).IsRequired();
             entity.Property(x => x.DataType).HasMaxLength(50).IsRequired();
+            entity.HasIndex(x => x.DatasetId);
+            entity.HasIndex(x => new { x.DatasetId, x.FieldName }).IsUnique();
 
             entity.HasOne(x => x.Dataset)
                 .WithMany(x => x.Fields)

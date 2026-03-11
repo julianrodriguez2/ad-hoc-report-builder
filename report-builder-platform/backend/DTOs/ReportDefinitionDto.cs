@@ -2,7 +2,7 @@ namespace backend.DTOs;
 
 public class ReportDefinitionDto
 {
-    public int DatasetId { get; set; }
+    public Guid DatasetId { get; set; }
 
     public List<string> Fields { get; set; } = new();
 

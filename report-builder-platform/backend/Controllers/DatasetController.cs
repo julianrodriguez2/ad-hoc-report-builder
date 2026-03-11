@@ -1,65 +1,51 @@
-using backend.Models;
+using backend.DTOs;
+using backend.Repositories;
 using Microsoft.AspNetCore.Mvc;
 
 namespace backend.Controllers;
 
 [ApiController]
 [Route("api/datasets")]
-public class DatasetController : ControllerBase
+public class DatasetController(IDatasetRepository datasetRepository) : ControllerBase
 {
-    [HttpGet]
-    public ActionResult<IEnumerable<Dataset>> GetDatasets()
-    {
-        var datasets = new List<Dataset>
-        {
-            new()
-            {
-                Id = 1,
-                Name = "Sales Dataset",
-                Description = "Transactions and revenue metrics",
-                ViewName = "vw_sales_summary"
-            },
-            new()
-            {
-                Id = 2,
-                Name = "Customers Dataset",
-                Description = "Customer profile and lifecycle data",
-                ViewName = "vw_customers"
-            }
-        };
+    private readonly IDatasetRepository _datasetRepository = datasetRepository;
 
-        return Ok(datasets);
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<DatasetMetadataDto>>> GetDatasets(CancellationToken cancellationToken)
+    {
+        var datasets = await _datasetRepository.GetDatasetsAsync(cancellationToken);
+
+        var response = datasets.Select(dataset => new DatasetMetadataDto
+        {
+            Id = dataset.Id,
+            Name = dataset.Name,
+            Description = dataset.Description
+        });
+
+        return Ok(response);
     }
 
-    [HttpGet("{id:int}/fields")]
-    public ActionResult<IEnumerable<DatasetField>> GetDatasetFields(int id)
+    [HttpGet("{id:guid}/fields")]
+    public async Task<ActionResult<IEnumerable<DatasetFieldMetadataDto>>> GetDatasetFields(Guid id, CancellationToken cancellationToken)
     {
-        var fields = new List<DatasetField>
+        var datasetExists = await _datasetRepository.DatasetExistsAsync(id, cancellationToken);
+        if (!datasetExists)
         {
-            new()
-            {
-                Id = 1,
-                DatasetId = id,
-                FieldName = "transaction_date",
-                DisplayName = "Transaction Date",
-                DataType = "date",
-                IsFilterable = true,
-                IsGroupable = true,
-                IsSummarizable = false
-            },
-            new()
-            {
-                Id = 2,
-                DatasetId = id,
-                FieldName = "net_revenue",
-                DisplayName = "Net Revenue",
-                DataType = "decimal",
-                IsFilterable = true,
-                IsGroupable = false,
-                IsSummarizable = true
-            }
-        };
+            return NotFound(new { message = $"Dataset with id '{id}' was not found." });
+        }
 
-        return Ok(fields);
+        var fields = await _datasetRepository.GetDatasetFieldsAsync(id, cancellationToken);
+        var response = fields.Select(field => new DatasetFieldMetadataDto
+        {
+            Id = field.Id,
+            FieldName = field.FieldName,
+            DisplayName = field.DisplayName,
+            DataType = field.DataType,
+            IsFilterable = field.IsFilterable,
+            IsGroupable = field.IsGroupable,
+            IsSummarizable = field.IsSummarizable
+        });
+
+        return Ok(response);
     }
 }

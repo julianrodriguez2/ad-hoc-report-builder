@@ -22,6 +22,16 @@
   flex-direction: column;
 }
 
+.status-message {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.status-message.error {
+  color: #b91c1c;
+}
+
 @media (max-width: 1024px) {
   .report-builder-page {
     height: auto;

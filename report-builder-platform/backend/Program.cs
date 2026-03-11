@@ -14,6 +14,12 @@ builder.Services.AddScoped<ISavedReportRepository, SavedReportRepository>();
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await AppDbInitializer.SeedMetadataAsync(dbContext);
+}
+
 app.UseAuthorization();
 app.MapControllers();
 

@@ -3,7 +3,7 @@ import { GroupDefinition } from './group-definition.model';
 import { SummaryDefinition } from './summary-definition.model';
 
 export interface ReportDefinition {
-  datasetId: number;
+  datasetId: string | null;
   fields: string[];
   filters: FilterDefinition[];
   grouping: GroupDefinition[];

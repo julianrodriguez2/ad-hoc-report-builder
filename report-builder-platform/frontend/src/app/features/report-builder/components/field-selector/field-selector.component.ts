@@ -1,6 +1,5 @@
-import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { PanelModule } from 'primeng/panel';
 
 import { Field } from '../../../../core/models/field.model';
@@ -8,45 +7,31 @@ import { Field } from '../../../../core/models/field.model';
 @Component({
   selector: 'app-field-selector',
   standalone: true,
-  imports: [CommonModule, DragDropModule, PanelModule],
+  imports: [CommonModule, PanelModule],
   templateUrl: './field-selector.component.html',
   styleUrl: './field-selector.component.scss'
 })
 export class FieldSelectorComponent {
-  protected readonly fields: Field[] = [
-    {
-      id: 1,
-      datasetId: 1,
-      fieldName: 'transaction_date',
-      displayName: 'Transaction Date',
-      dataType: 'date',
-      isFilterable: true,
-      isGroupable: true,
-      isSummarizable: false
-    },
-    {
-      id: 2,
-      datasetId: 1,
-      fieldName: 'region',
-      displayName: 'Region',
-      dataType: 'string',
-      isFilterable: true,
-      isGroupable: true,
-      isSummarizable: false
-    },
-    {
-      id: 3,
-      datasetId: 1,
-      fieldName: 'net_revenue',
-      displayName: 'Net Revenue',
-      dataType: 'decimal',
-      isFilterable: true,
-      isGroupable: false,
-      isSummarizable: true
-    }
-  ];
+  @Input() availableFields: Field[] = [];
 
-  protected drop(event: CdkDragDrop<Field[]>): void {
-    moveItemInArray(this.fields, event.previousIndex, event.currentIndex);
+  @Input() selectedFieldNames: string[] = [];
+
+  @Output() selectedFieldNamesChange = new EventEmitter<string[]>();
+
+  protected isSelected(fieldName: string): boolean {
+    return this.selectedFieldNames.includes(fieldName);
+  }
+
+  protected onFieldToggled(fieldName: string, event: Event): void {
+    const isChecked = (event.target as HTMLInputElement).checked;
+    const selected = new Set(this.selectedFieldNames);
+
+    if (isChecked) {
+      selected.add(fieldName);
+    } else {
+      selected.delete(fieldName);
+    }
+
+    this.selectedFieldNamesChange.emit(Array.from(selected));
   }
 }
