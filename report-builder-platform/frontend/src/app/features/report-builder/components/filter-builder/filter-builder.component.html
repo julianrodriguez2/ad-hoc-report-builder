@@ -1,10 +1,163 @@
-<p-panel header="Filter Builder">
-  <div class="filter-list">
-    @for (filter of filters; track filter.fieldName + filter.operator) {
-      <div class="filter-item">
-        <strong>{{ filter.fieldName }}</strong>
-        <span>{{ filter.operator }}</span>
+<p-panel>
+  <ng-template pTemplate="header">
+    <div class="panel-header">
+      <div class="panel-heading">
+        <h3>Filters</h3>
+        <p>Filters limit which records appear in the report.</p>
       </div>
-    }
-  </div>
+      <button
+        pButton
+        type="button"
+        label="Add Filter"
+        icon="pi pi-plus"
+        size="small"
+        [disabled]="!hasFilterableFields()"
+        (click)="addFilter()"
+      ></button>
+    </div>
+  </ng-template>
+
+  @if (!hasFilterableFields()) {
+    <p class="placeholder-message">Select a dataset to load fields before adding filters.</p>
+  } @else if (filters.length === 0) {
+    <p class="placeholder-message">No filters added yet.</p>
+  } @else {
+    <div class="filter-list">
+      @for (filter of filters; track trackByFilterId($index, filter)) {
+        <div class="filter-row">
+          <div class="control field-control">
+            <label>Field</label>
+            <p-dropdown
+              [options]="fieldOptions()"
+              optionLabel="label"
+              optionValue="value"
+              [showClear]="true"
+              [ngModel]="filter.fieldName || null"
+              placeholder="Select field"
+              appendTo="body"
+              (onChange)="onFieldChanged(filter.id, $event.value ?? null)"
+            ></p-dropdown>
+          </div>
+
+          <div class="control operator-control">
+            <label>Operator</label>
+            <p-dropdown
+              [options]="operatorOptions(filter)"
+              optionLabel="label"
+              optionValue="value"
+              [ngModel]="filter.operator || null"
+              [disabled]="operatorDisabled(filter)"
+              placeholder="Select operator"
+              appendTo="body"
+              (onChange)="onOperatorChanged(filter.id, $event.value ?? null)"
+            ></p-dropdown>
+          </div>
+
+          <div class="control value-control">
+            <label>Value</label>
+            @if (!filter.fieldName || !filter.operator) {
+              <p class="inline-message">Select a field and operator.</p>
+            } @else if (!requiresValueForOperator(filter.operator)) {
+              <p class="inline-message">No value required for this operator.</p>
+            } @else if (isStringFilter(filter)) {
+              <input
+                pInputText
+                type="text"
+                [ngModel]="stringValue(filter)"
+                [disabled]="valueDisabled(filter)"
+                placeholder="Enter text"
+                (ngModelChange)="onStringValueChanged(filter.id, $event)"
+              />
+            } @else if (isNumberFilter(filter) && !isBetween(filter)) {
+              <p-inputNumber
+                [ngModel]="numberValue(filter)"
+                [disabled]="valueDisabled(filter)"
+                mode="decimal"
+                [useGrouping]="false"
+                placeholder="Enter number"
+                (ngModelChange)="onNumberValueChanged(filter.id, $event)"
+              ></p-inputNumber>
+            } @else if (isNumberFilter(filter) && isBetween(filter)) {
+              <div class="range-inputs">
+                <p-inputNumber
+                  [ngModel]="numberRangeValue(filter, 'min')"
+                  [disabled]="valueDisabled(filter)"
+                  mode="decimal"
+                  [useGrouping]="false"
+                  placeholder="Min"
+                  (ngModelChange)="onNumberRangeValueChanged(filter.id, 'min', $event)"
+                ></p-inputNumber>
+                <p-inputNumber
+                  [ngModel]="numberRangeValue(filter, 'max')"
+                  [disabled]="valueDisabled(filter)"
+                  mode="decimal"
+                  [useGrouping]="false"
+                  placeholder="Max"
+                  (ngModelChange)="onNumberRangeValueChanged(filter.id, 'max', $event)"
+                ></p-inputNumber>
+              </div>
+            } @else if (isDateFilter(filter) && !isBetween(filter)) {
+              <p-calendar
+                [ngModel]="dateValue(filter)"
+                [disabled]="valueDisabled(filter)"
+                dateFormat="yy-mm-dd"
+                [showIcon]="true"
+                [showButtonBar]="true"
+                placeholder="Select date"
+                appendTo="body"
+                (ngModelChange)="onDateValueChanged(filter.id, $event)"
+              ></p-calendar>
+            } @else if (isDateFilter(filter) && isBetween(filter)) {
+              <div class="range-inputs">
+                <p-calendar
+                  [ngModel]="dateRangeValue(filter, 'start')"
+                  [disabled]="valueDisabled(filter)"
+                  dateFormat="yy-mm-dd"
+                  [showIcon]="true"
+                  [showButtonBar]="true"
+                  placeholder="Start date"
+                  appendTo="body"
+                  (ngModelChange)="onDateRangeValueChanged(filter.id, 'start', $event)"
+                ></p-calendar>
+                <p-calendar
+                  [ngModel]="dateRangeValue(filter, 'end')"
+                  [disabled]="valueDisabled(filter)"
+                  dateFormat="yy-mm-dd"
+                  [showIcon]="true"
+                  [showButtonBar]="true"
+                  placeholder="End date"
+                  appendTo="body"
+                  (ngModelChange)="onDateRangeValueChanged(filter.id, 'end', $event)"
+                ></p-calendar>
+              </div>
+            } @else if (isBooleanFilter(filter)) {
+              <p-dropdown
+                [options]="booleanOptions"
+                optionLabel="label"
+                optionValue="value"
+                [ngModel]="booleanValue(filter)"
+                [disabled]="valueDisabled(filter)"
+                placeholder="Select value"
+                appendTo="body"
+                (onChange)="onBooleanValueChanged(filter.id, $event.value ?? null)"
+              ></p-dropdown>
+            }
+          </div>
+
+          <div class="remove-control">
+            <button
+              pButton
+              type="button"
+              icon="pi pi-times"
+              text
+              rounded
+              severity="secondary"
+              aria-label="Remove filter"
+              (click)="removeFilter(filter.id)"
+            ></button>
+          </div>
+        </div>
+      }
+    </div>
+  }
 </p-panel>

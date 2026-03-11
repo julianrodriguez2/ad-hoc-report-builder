@@ -32,7 +32,11 @@
         @if (fieldsLoadError) {
           <p class="status-message error">{{ fieldsLoadError }}</p>
         }
-        <app-filter-builder></app-filter-builder>
+        <app-filter-builder
+          [availableFields]="availableFields"
+          [filters]="reportDefinition.filters"
+          (filtersChanged)="onFiltersChanged($event)"
+        ></app-filter-builder>
         <app-grouping-builder></app-grouping-builder>
         <app-summary-builder></app-summary-builder>
       </div>
