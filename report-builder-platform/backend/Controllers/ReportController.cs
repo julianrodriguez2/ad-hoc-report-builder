@@ -6,16 +6,16 @@ namespace backend.Controllers;
 
 [ApiController]
 [Route("api/reports")]
-public class ReportController(IReportQueryBuilderService reportQueryBuilderService) : ControllerBase
+public class ReportController(IReportPreviewService reportPreviewService) : ControllerBase
 {
-    private readonly IReportQueryBuilderService _reportQueryBuilderService = reportQueryBuilderService;
+    private readonly IReportPreviewService _reportPreviewService = reportPreviewService;
 
     [HttpPost("preview")]
-    public async Task<ActionResult<QueryBuildResult>> Preview([FromBody] ReportDefinitionDto definition, CancellationToken cancellationToken)
+    public async Task<ActionResult<PreviewResultDto>> Preview([FromBody] ReportDefinitionDto definition, CancellationToken cancellationToken)
     {
         try
         {
-            var result = await _reportQueryBuilderService.BuildPreviewQueryAsync(definition, cancellationToken);
+            var result = await _reportPreviewService.ExecutePreviewAsync(definition, cancellationToken);
             return Ok(result);
         }
         catch (ReportValidationException exception)
@@ -24,6 +24,29 @@ public class ReportController(IReportQueryBuilderService reportQueryBuilderServi
             {
                 message = "Report definition validation failed.",
                 errors = exception.Errors
+            });
+        }
+        catch (PreviewExecutionException exception) when (exception.IsTimeout)
+        {
+            return BadRequest(new
+            {
+                message = "Preview query exceeded the allowed execution time.",
+                errors = new[] { "Preview query exceeded the allowed execution time." }
+            });
+        }
+        catch (PreviewExecutionException exception)
+        {
+            return BadRequest(new
+            {
+                message = exception.Message,
+                errors = new[] { exception.Message }
+            });
+        }
+        catch (Exception)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new
+            {
+                message = "An unexpected error occurred while running report preview."
             });
         }
     }

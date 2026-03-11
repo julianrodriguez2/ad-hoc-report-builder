@@ -1,28 +1,39 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, Input } from '@angular/core';
+import { MessageModule } from 'primeng/message';
 import { PanelModule } from 'primeng/panel';
+import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { TableModule } from 'primeng/table';
+
+import { PreviewColumn } from '../../../../core/models/preview-result.model';
 
 @Component({
   selector: 'app-preview-grid',
   standalone: true,
-  imports: [CommonModule, PanelModule, TableModule],
+  imports: [CommonModule, PanelModule, TableModule, ProgressSpinnerModule, MessageModule],
   templateUrl: './preview-grid.component.html',
   styleUrl: './preview-grid.component.scss'
 })
 export class PreviewGridComponent {
-  protected readonly columns = ['transaction_date', 'region', 'net_revenue'];
+  @Input() columns: PreviewColumn[] = [];
 
-  protected readonly rows = [
-    {
-      transaction_date: '2025-01-03',
-      region: 'North America',
-      net_revenue: 43210
-    },
-    {
-      transaction_date: '2025-01-04',
-      region: 'Europe',
-      net_revenue: 27110
-    }
-  ];
+  @Input() rows: Record<string, unknown>[] = [];
+
+  @Input() loading = false;
+
+  @Input() errorMessage: string | null = null;
+
+  @Input() isTruncated = false;
+
+  @Input() hasAttemptedPreview = false;
+
+  @Input() debugSql: string | null = null;
+
+  protected trackByColumn(_: number, column: PreviewColumn): string {
+    return column.fieldName;
+  }
+
+  protected readCellValue(row: Record<string, unknown>, fieldName: string): unknown {
+    return row[fieldName] ?? '';
+  }
 }

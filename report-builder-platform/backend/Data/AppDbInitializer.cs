@@ -165,6 +165,8 @@ public static class AppDbInitializer
                 }
             },
             cancellationToken);
+
+        await SeedPreviewViewsAndSampleRowsAsync(dbContext, cancellationToken);
     }
 
     private static async Task SeedFieldsForDatasetAsync(
@@ -190,5 +192,94 @@ public static class AppDbInitializer
 
         await dbContext.DatasetFields.AddRangeAsync(missingFields, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task SeedPreviewViewsAndSampleRowsAsync(AppDbContext dbContext, CancellationToken cancellationToken)
+    {
+        const string createPermitsTableSql = """
+            IF OBJECT_ID('dbo.PermitsPreviewData', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.PermitsPreviewData
+                (
+                    PermitNumber NVARCHAR(50) NOT NULL,
+                    ApplicantName NVARCHAR(150) NOT NULL,
+                    PermitType NVARCHAR(100) NOT NULL,
+                    IssueDate DATE NOT NULL,
+                    Status NVARCHAR(50) NOT NULL
+                );
+            END
+            """;
+
+        const string createInspectionsTableSql = """
+            IF OBJECT_ID('dbo.InspectionsPreviewData', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.InspectionsPreviewData
+                (
+                    InspectionId NVARCHAR(50) NOT NULL,
+                    InspectorName NVARCHAR(150) NOT NULL,
+                    InspectionDate DATE NOT NULL,
+                    InspectionStatus NVARCHAR(50) NOT NULL
+                );
+            END
+            """;
+
+        const string seedPermitsRowsSql = """
+            IF NOT EXISTS (SELECT 1 FROM dbo.PermitsPreviewData)
+            BEGIN
+                INSERT INTO dbo.PermitsPreviewData (PermitNumber, ApplicantName, PermitType, IssueDate, Status)
+                VALUES
+                    ('PR-1001', 'Jane Doe', 'Residential', '2024-01-05', 'Active'),
+                    ('PR-1002', 'Acme Builders', 'Commercial', '2024-01-12', 'Pending'),
+                    ('PR-1003', 'Northside Holdings', 'Signage', '2024-02-01', 'Active');
+            END
+            """;
+
+        const string seedInspectionsRowsSql = """
+            IF NOT EXISTS (SELECT 1 FROM dbo.InspectionsPreviewData)
+            BEGIN
+                INSERT INTO dbo.InspectionsPreviewData (InspectionId, InspectorName, InspectionDate, InspectionStatus)
+                VALUES
+                    ('INSP-3001', 'Luis Martinez', '2024-01-06', 'Passed'),
+                    ('INSP-3002', 'Ava Johnson', '2024-01-17', 'Failed'),
+                    ('INSP-3003', 'Elena Singh', '2024-02-08', 'Passed');
+            END
+            """;
+
+        const string createPermitsViewSql = """
+            CREATE OR ALTER VIEW dbo.vw_permits_reporting
+            AS
+            SELECT
+                PermitNumber,
+                ApplicantName,
+                PermitType,
+                IssueDate,
+                Status
+            FROM dbo.PermitsPreviewData;
+            """;
+
+        const string createInspectionsViewSql = """
+            CREATE OR ALTER VIEW dbo.vw_inspections_reporting
+            AS
+            SELECT
+                InspectionId,
+                InspectorName,
+                InspectionDate,
+                InspectionStatus
+            FROM dbo.InspectionsPreviewData;
+            """;
+
+        try
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(createPermitsTableSql, cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(createInspectionsTableSql, cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(seedPermitsRowsSql, cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(seedInspectionsRowsSql, cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(createPermitsViewSql, cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(createInspectionsViewSql, cancellationToken);
+        }
+        catch
+        {
+            // Preview fixture objects are optional and should not block startup in locked-down environments.
+        }
     }
 }

@@ -1,18 +1,49 @@
-<p-panel header="Preview Grid">
-  <p-table [value]="rows" [tableStyle]="{ 'min-width': '100%' }" size="small">
-    <ng-template pTemplate="header">
-      <tr>
-        @for (column of columns; track column) {
-          <th>{{ column }}</th>
-        }
-      </tr>
-    </ng-template>
-    <ng-template pTemplate="body" let-row>
-      <tr>
-        @for (column of columns; track column) {
-          <td>{{ row[column] }}</td>
-        }
-      </tr>
-    </ng-template>
-  </p-table>
+<p-panel header="Preview Results">
+  @if (loading) {
+    <div class="state-container">
+      <p-progressSpinner strokeWidth="4" [style]="{ width: '2rem', height: '2rem' }"></p-progressSpinner>
+      <p>Running preview query...</p>
+    </div>
+  } @else if (errorMessage) {
+    <div class="state-container">
+      <p-message severity="error" [text]="errorMessage"></p-message>
+    </div>
+  } @else if (!hasAttemptedPreview) {
+    <div class="state-container">
+      <p>Build your report and click Run Preview to see results.</p>
+    </div>
+  } @else if (rows.length === 0) {
+    <div class="state-container">
+      <p>No rows returned for the current preview.</p>
+    </div>
+  } @else {
+    @if (isTruncated) {
+      <p class="preview-warning">Preview limited to first 100 rows.</p>
+    }
+
+    <p-table [value]="rows" [tableStyle]="{ 'min-width': '100%' }" size="small" [scrollable]="true" scrollHeight="flex">
+      <ng-template pTemplate="header">
+        <tr>
+          @for (column of columns; track trackByColumn($index, column)) {
+            <th>{{ column.displayName }}</th>
+          }
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="body" let-row>
+        <tr>
+          @for (column of columns; track trackByColumn($index, column)) {
+            <td>{{ readCellValue(row, column.fieldName) }}</td>
+          }
+        </tr>
+      </ng-template>
+    </p-table>
+
+    @if (debugSql) {
+      <details class="debug-sql">
+        <summary>Debug SQL</summary>
+        <pre>{{ debugSql }}</pre>
+      </details>
+    }
+  }
 </p-panel>

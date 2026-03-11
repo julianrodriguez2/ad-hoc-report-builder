@@ -44,7 +44,27 @@
 
     <ng-template pTemplate>
       <div class="center-panel">
-        <app-preview-grid></app-preview-grid>
+        <div class="preview-toolbar">
+          <button
+            pButton
+            type="button"
+            label="Run Preview"
+            icon="pi pi-play"
+            [loading]="previewLoading"
+            [disabled]="previewLoading"
+            (click)="runPreview()"
+          ></button>
+        </div>
+
+        <app-preview-grid
+          [columns]="previewResult?.columns ?? []"
+          [rows]="previewResult?.rows ?? []"
+          [loading]="previewLoading"
+          [errorMessage]="previewError"
+          [isTruncated]="previewResult?.isTruncated ?? false"
+          [hasAttemptedPreview]="hasPreviewRun"
+          [debugSql]="previewResult?.debugSql ?? null"
+        ></app-preview-grid>
       </div>
     </ng-template>
 

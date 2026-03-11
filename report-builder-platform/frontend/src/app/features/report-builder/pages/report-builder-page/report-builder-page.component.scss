@@ -20,6 +20,7 @@
 .center-panel {
   display: flex;
   flex-direction: column;
+  gap: 0.6rem;
 }
 
 .status-message {
@@ -30,6 +31,16 @@
 
 .status-message.error {
   color: #b91c1c;
+}
+
+.preview-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+app-preview-grid {
+  flex: 1;
+  min-height: 0;
 }
 
 @media (max-width: 1024px) {

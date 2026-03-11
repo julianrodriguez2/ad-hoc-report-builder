@@ -1,8 +1,10 @@
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
+import { ButtonModule } from 'primeng/button';
 import { DropdownModule } from 'primeng/dropdown';
 import { PanelModule } from 'primeng/panel';
 import { SplitterModule } from 'primeng/splitter';
@@ -10,8 +12,10 @@ import { SplitterModule } from 'primeng/splitter';
 import { Dataset } from '../../../../core/models/dataset.model';
 import { Field } from '../../../../core/models/field.model';
 import { FilterDefinition } from '../../../../core/models/filter-definition.model';
+import { PreviewResult } from '../../../../core/models/preview-result.model';
 import { ReportDefinition } from '../../../../core/models/report-definition.model';
 import { DatasetService } from '../../../../core/services/dataset.service';
+import { ReportService } from '../../../../core/services/report.service';
 import { FieldSelectorComponent } from '../../components/field-selector/field-selector.component';
 import { FilterBuilderComponent } from '../../components/filter-builder/filter-builder.component';
 import { GroupingBuilderComponent } from '../../components/grouping-builder/grouping-builder.component';
@@ -26,6 +30,7 @@ import { PreviewGridComponent } from '../../../report-preview/components/preview
   imports: [
     CommonModule,
     FormsModule,
+    ButtonModule,
     DropdownModule,
     PanelModule,
     SplitterModule,
@@ -52,6 +57,10 @@ export class ReportBuilderPageComponent implements OnInit {
   protected isFieldsLoading = false;
   protected datasetsLoadError: string | null = null;
   protected fieldsLoadError: string | null = null;
+  protected previewLoading = false;
+  protected previewError: string | null = null;
+  protected previewResult: PreviewResult | null = null;
+  protected hasPreviewRun = false;
 
   protected reportDefinition: ReportDefinition = {
     datasetId: null,
@@ -62,7 +71,10 @@ export class ReportBuilderPageComponent implements OnInit {
     layoutSettings: {}
   };
 
-  constructor(private readonly datasetService: DatasetService) {}
+  constructor(
+    private readonly datasetService: DatasetService,
+    private readonly reportService: ReportService
+  ) {}
 
   ngOnInit(): void {
     this.loadDatasets();
@@ -79,6 +91,7 @@ export class ReportBuilderPageComponent implements OnInit {
       fields: [],
       filters: []
     };
+    this.resetPreviewState();
 
     if (!datasetId) {
       return;
@@ -104,6 +117,44 @@ export class ReportBuilderPageComponent implements OnInit {
       ...this.reportDefinition,
       filters
     };
+  }
+
+  protected runPreview(): void {
+    this.hasPreviewRun = true;
+    this.previewError = null;
+
+    if (!this.reportDefinition.datasetId) {
+      this.previewError = 'Select a dataset before running preview.';
+      this.previewResult = null;
+      return;
+    }
+
+    if (this.reportDefinition.fields.length === 0) {
+      this.previewError = 'Select at least one field before running preview.';
+      this.previewResult = null;
+      return;
+    }
+
+    this.previewLoading = true;
+
+    this.reportService
+      .previewReport(this.reportDefinition)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          this.previewLoading = false;
+        })
+      )
+      .subscribe({
+        next: (result) => {
+          this.previewResult = result;
+          this.previewError = null;
+        },
+        error: (error: unknown) => {
+          this.previewResult = null;
+          this.previewError = this.toPreviewErrorMessage(error);
+        }
+      });
   }
 
   private loadDatasets(): void {
@@ -152,5 +203,33 @@ export class ReportBuilderPageComponent implements OnInit {
           this.fieldsLoadError = 'Unable to load fields for the selected dataset.';
         }
       });
+  }
+
+  private resetPreviewState(): void {
+    this.previewLoading = false;
+    this.previewError = null;
+    this.previewResult = null;
+    this.hasPreviewRun = false;
+  }
+
+  private toPreviewErrorMessage(error: unknown): string {
+    if (!(error instanceof HttpErrorResponse)) {
+      return 'Unable to run preview due to an unexpected error.';
+    }
+
+    const payload = error.error as {
+      message?: string;
+      errors?: string[];
+    } | null;
+
+    if (payload?.errors && payload.errors.length > 0) {
+      return payload.errors.join(' ');
+    }
+
+    if (payload?.message) {
+      return payload.message;
+    }
+
+    return 'Unable to run preview due to an unexpected error.';
   }
 }
