@@ -11,55 +11,47 @@ public class ReportController(IReportQueryBuilderService reportQueryBuilderServi
     private readonly IReportQueryBuilderService _reportQueryBuilderService = reportQueryBuilderService;
 
     [HttpPost("preview")]
-    public ActionResult<object> Preview([FromBody] ReportDefinitionDto definition)
+    public async Task<ActionResult<QueryBuildResult>> Preview([FromBody] ReportDefinitionDto definition, CancellationToken cancellationToken)
     {
-        var query = _reportQueryBuilderService.BuildPreviewQuery(definition);
-
-        return Ok(new
+        try
         {
-            sql = query,
-            rows = new[]
+            var result = await _reportQueryBuilderService.BuildPreviewQueryAsync(definition, cancellationToken);
+            return Ok(result);
+        }
+        catch (ReportValidationException exception)
+        {
+            return BadRequest(new
             {
-                new { transaction_date = "2026-01-01", region = "North America", net_revenue = 12000 },
-                new { transaction_date = "2026-01-02", region = "Europe", net_revenue = 9800 }
-            }
-        });
+                message = "Report definition validation failed.",
+                errors = exception.Errors
+            });
+        }
     }
 
     [HttpPost("run")]
-    public ActionResult<object> Run([FromBody] ReportDefinitionDto definition)
+    public ActionResult<object> Run()
     {
-        var query = _reportQueryBuilderService.BuildFullQuery(definition);
-
-        return Ok(new
+        return StatusCode(StatusCodes.Status501NotImplemented, new
         {
-            sql = query,
-            totalRows = 200,
-            status = "Stub execution completed"
+            message = "Report execution is not implemented yet."
         });
     }
 
     [HttpPost("export/pdf")]
-    public ActionResult<object> ExportPdf([FromBody] ReportDefinitionDto definition)
+    public ActionResult<object> ExportPdf()
     {
-        _ = _reportQueryBuilderService.BuildFullQuery(definition);
-
-        return Ok(new
+        return StatusCode(StatusCodes.Status501NotImplemented, new
         {
-            message = "PDF export queued (stub)",
-            fileToken = Guid.NewGuid().ToString("N")
+            message = "PDF export is not implemented yet."
         });
     }
 
     [HttpPost("export/excel")]
-    public ActionResult<object> ExportExcel([FromBody] ReportDefinitionDto definition)
+    public ActionResult<object> ExportExcel()
     {
-        _ = _reportQueryBuilderService.BuildFullQuery(definition);
-
-        return Ok(new
+        return StatusCode(StatusCodes.Status501NotImplemented, new
         {
-            message = "Excel export queued (stub)",
-            fileToken = Guid.NewGuid().ToString("N")
+            message = "Excel export is not implemented yet."
         });
     }
 }
