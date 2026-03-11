@@ -44,6 +44,7 @@ export class ReportBuilderPageComponent implements OnInit {
 
   protected datasets: Dataset[] = [];
   protected availableFields: Field[] = [];
+  protected selectedFields: Field[] = [];
   protected selectedDatasetId: string | null = null;
 
   protected isDatasetsLoading = false;
@@ -70,6 +71,7 @@ export class ReportBuilderPageComponent implements OnInit {
     this.selectedDatasetId = datasetId;
     this.fieldsLoadError = null;
     this.availableFields = [];
+    this.selectedFields = [];
     this.reportDefinition = {
       ...this.reportDefinition,
       datasetId,
@@ -83,10 +85,15 @@ export class ReportBuilderPageComponent implements OnInit {
     this.loadDatasetFields(datasetId);
   }
 
-  protected onSelectedFieldsChanged(selectedFieldNames: string[]): void {
+  protected onSelectedFieldsChanged(selectedFields: Field[]): void {
+    this.selectedFields = selectedFields;
+
     this.reportDefinition = {
       ...this.reportDefinition,
-      fields: selectedFieldNames
+      fields: selectedFields.map((field) => ({
+        fieldName: field.fieldName,
+        displayName: field.displayName
+      }))
     };
   }
 

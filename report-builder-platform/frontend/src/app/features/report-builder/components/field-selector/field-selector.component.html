@@ -1,19 +1,59 @@
-<p-panel header="Available Fields">
-  @if (availableFields.length === 0) {
-    <p class="empty-state">Select a dataset to load fields.</p>
-  } @else {
-    <div class="field-list">
-      @for (field of availableFields; track field.id) {
-        <label class="field-item" [for]="field.id">
-          <input
-            type="checkbox"
-            [id]="field.id"
-            [checked]="isSelected(field.fieldName)"
-            (change)="onFieldToggled(field.fieldName, $event)"
-          />
-          <span>{{ field.displayName }}</span>
-        </label>
-      }
-    </div>
-  }
+<p-panel header="Field Selection Builder">
+  <div class="field-builder-grid" cdkDropListGroup>
+    <section class="field-column">
+      <h4 class="column-title">Available Fields</h4>
+      <div
+        cdkDropList
+        [id]="availableListId"
+        [cdkDropListData]="availableList"
+        [cdkDropListConnectedTo]="[selectedListId]"
+        class="field-drop-zone"
+        (cdkDropListDropped)="onDrop($event)"
+      >
+        @if (availableList.length === 0) {
+          <p class="empty-state">All fields are currently selected.</p>
+        } @else {
+          @for (field of availableList; track trackByFieldName($index, field)) {
+            <div class="field-row" cdkDrag>
+              <span class="drag-handle" cdkDragHandle>
+                <i class="pi pi-bars"></i>
+              </span>
+              <span class="field-name">{{ field.displayName }}</span>
+              <button type="button" class="icon-button" (click)="addField(field)" aria-label="Add field">
+                <i class="pi pi-plus"></i>
+              </button>
+            </div>
+          }
+        }
+      </div>
+    </section>
+
+    <section class="field-column">
+      <h4 class="column-title">Selected Fields</h4>
+      <div
+        cdkDropList
+        [id]="selectedListId"
+        [cdkDropListData]="selectedList"
+        [cdkDropListConnectedTo]="[availableListId]"
+        class="field-drop-zone selected-zone"
+        (cdkDropListDropped)="onDrop($event)"
+      >
+        @if (selectedList.length === 0) {
+          <p class="empty-state">No fields selected yet. Drag fields here.</p>
+        } @else {
+          @for (field of selectedList; track trackByFieldName($index, field)) {
+            <div class="field-row selected-row" cdkDrag>
+              <span class="drag-handle" cdkDragHandle>
+                <i class="pi pi-bars"></i>
+              </span>
+              <span class="field-name">{{ field.displayName }}</span>
+              <button type="button" class="icon-button" (click)="removeField(field)" aria-label="Remove field">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+          }
+        }
+      </div>
+    </section>
+  </div>
 </p-panel>

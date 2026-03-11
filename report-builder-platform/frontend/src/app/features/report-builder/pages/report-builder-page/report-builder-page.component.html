@@ -23,8 +23,8 @@
 
         <app-field-selector
           [availableFields]="availableFields"
-          [selectedFieldNames]="reportDefinition.fields"
-          (selectedFieldNamesChange)="onSelectedFieldsChanged($event)"
+          [selectedFields]="selectedFields"
+          (fieldsChanged)="onSelectedFieldsChanged($event)"
         ></app-field-selector>
         @if (isFieldsLoading) {
           <p class="status-message">Loading fields...</p>
