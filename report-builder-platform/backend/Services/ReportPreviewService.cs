@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.Common;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using backend.Data;
 using backend.DTOs;
@@ -7,41 +8,59 @@ using Microsoft.EntityFrameworkCore;
 
 namespace backend.Services;
 
-public class ReportPreviewService(AppDbContext dbContext, IReportQueryBuilderService reportQueryBuilderService) : IReportPreviewService
+public class ReportPreviewService(
+    AppDbContext dbContext,
+    IReportQueryBuilderService reportQueryBuilderService,
+    IReportGuardrailService reportGuardrailService) : IReportPreviewService
 {
-    private const int PreviewRowLimit = 100;
-    private const int PreviewTimeoutSeconds = 10;
     private static readonly Regex SelectClausePattern = new(@"^\s*SELECT\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private readonly AppDbContext _dbContext = dbContext;
     private readonly IReportQueryBuilderService _reportQueryBuilderService = reportQueryBuilderService;
+    private readonly IReportGuardrailService _reportGuardrailService = reportGuardrailService;
 
     public async Task<PreviewResultDto> ExecutePreviewAsync(ReportDefinitionDto definition, CancellationToken cancellationToken = default)
     {
-        var queryBuildResult = await _reportQueryBuilderService.BuildPreviewQueryAsync(definition, cancellationToken);
-        var previewSql = ApplyPreviewGuardrails(queryBuildResult.Sql);
-
+        var stopwatch = Stopwatch.StartNew();
+        var dataset = await _reportQueryBuilderService.GetValidatedDatasetAsync(definition.DatasetId, cancellationToken);
         var datasetFieldMap = await _reportQueryBuilderService.GetDatasetFieldMapAsync(definition.DatasetId, cancellationToken);
+        var guardrailSettings = _reportGuardrailService.ValidatePreviewRequest(definition, dataset, datasetFieldMap);
+
+        var queryBuildResult = await _reportQueryBuilderService.BuildPreviewQueryAsync(definition, cancellationToken);
+        var previewSql = ApplyPreviewGuardrails(queryBuildResult.Sql, guardrailSettings.PreviewRowLimit);
+
         var columns = BuildColumnMetadata(definition, datasetFieldMap);
 
-        var rows = await ExecuteQueryAsync(previewSql, queryBuildResult.Parameters, cancellationToken);
+        var rows = await ExecuteQueryAsync(
+            previewSql,
+            queryBuildResult.Parameters,
+            guardrailSettings.TimeoutSeconds,
+            cancellationToken);
         var rowCount = rows.Count;
+        stopwatch.Stop();
 
         return new PreviewResultDto
         {
             Columns = columns,
             Rows = rows,
             RowCount = rowCount,
-            IsTruncated = rowCount >= PreviewRowLimit,
+            IsTruncated = rowCount >= guardrailSettings.PreviewRowLimit,
+            AppliedRowLimit = guardrailSettings.PreviewRowLimit,
+            ExecutionTimeMs = stopwatch.ElapsedMilliseconds,
             DebugSql = previewSql
         };
     }
 
-    private static string ApplyPreviewGuardrails(string sql)
+    private static string ApplyPreviewGuardrails(string sql, int previewRowLimit)
     {
         if (string.IsNullOrWhiteSpace(sql))
         {
             throw new ReportValidationException("Generated SQL is empty.");
+        }
+
+        if (previewRowLimit <= 0)
+        {
+            throw new ReportValidationException("Preview row limit must be greater than zero.");
         }
 
         if (!sql.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase))
@@ -54,7 +73,7 @@ public class ReportPreviewService(AppDbContext dbContext, IReportQueryBuilderSer
             throw new ReportValidationException("Generated SQL is not in a valid SELECT format.");
         }
 
-        return SelectClausePattern.Replace(sql, $"SELECT TOP ({PreviewRowLimit}) ", 1);
+        return SelectClausePattern.Replace(sql, $"SELECT TOP ({previewRowLimit}) ", 1);
     }
 
     private static List<PreviewColumnDto> BuildColumnMetadata(
@@ -62,6 +81,69 @@ public class ReportPreviewService(AppDbContext dbContext, IReportQueryBuilderSer
         IReadOnlyDictionary<string, Models.DatasetField> datasetFieldMap)
     {
         var columns = new List<PreviewColumnDto>();
+
+        if ((definition.Summaries?.Count ?? 0) > 0)
+        {
+            var orderedGrouping = (definition.Grouping ?? [])
+                .Select((group, index) => new
+                {
+                    Group = group,
+                    Order = group.GroupOrder <= 0 ? index + 1 : group.GroupOrder,
+                    Index = index
+                })
+                .OrderBy(item => item.Order)
+                .ThenBy(item => item.Index)
+                .Select(item => item.Group);
+
+            foreach (var group in orderedGrouping)
+            {
+                var fieldName = group.FieldName?.Trim();
+                if (string.IsNullOrWhiteSpace(fieldName))
+                {
+                    continue;
+                }
+
+                if (!datasetFieldMap.TryGetValue(fieldName, out var metadataField))
+                {
+                    continue;
+                }
+
+                columns.Add(new PreviewColumnDto
+                {
+                    FieldName = metadataField.FieldName,
+                    DisplayName = metadataField.DisplayName
+                });
+            }
+
+            var orderedSummaries = (definition.Summaries ?? [])
+                .Select((summary, index) => new
+                {
+                    Summary = summary,
+                    Order = summary.SummaryOrder <= 0 ? index + 1 : summary.SummaryOrder,
+                    Index = index
+                })
+                .OrderBy(item => item.Order)
+                .ThenBy(item => item.Index)
+                .Select(item => item.Summary);
+
+            foreach (var summary in orderedSummaries)
+            {
+                var alias = summary.Alias?.Trim();
+                if (string.IsNullOrWhiteSpace(alias))
+                {
+                    continue;
+                }
+
+                columns.Add(new PreviewColumnDto
+                {
+                    FieldName = alias,
+                    DisplayName = alias
+                });
+            }
+
+            return columns;
+        }
+
         foreach (var selectedField in definition.Fields ?? [])
         {
             var fieldName = selectedField.FieldName?.Trim();
@@ -88,6 +170,7 @@ public class ReportPreviewService(AppDbContext dbContext, IReportQueryBuilderSer
     private async Task<List<Dictionary<string, object?>>> ExecuteQueryAsync(
         string sql,
         IReadOnlyDictionary<string, object?> parameters,
+        int timeoutSeconds,
         CancellationToken cancellationToken)
     {
         var connection = _dbContext.Database.GetDbConnection();
@@ -104,7 +187,7 @@ public class ReportPreviewService(AppDbContext dbContext, IReportQueryBuilderSer
             using var command = connection.CreateCommand();
             command.CommandText = sql;
             command.CommandType = CommandType.Text;
-            command.CommandTimeout = PreviewTimeoutSeconds;
+            command.CommandTimeout = timeoutSeconds;
 
             foreach (var parameter in parameters)
             {

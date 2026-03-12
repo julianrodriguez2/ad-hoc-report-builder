@@ -22,7 +22,7 @@ public class ReportController(IReportPreviewService reportPreviewService) : Cont
         {
             return BadRequest(new
             {
-                message = "Report definition validation failed.",
+                message = "Report validation failed.",
                 errors = exception.Errors
             });
         }

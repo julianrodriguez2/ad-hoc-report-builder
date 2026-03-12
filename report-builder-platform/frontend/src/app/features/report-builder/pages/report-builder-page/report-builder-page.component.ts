@@ -15,6 +15,7 @@ import { FilterDefinition } from '../../../../core/models/filter-definition.mode
 import { GroupDefinition } from '../../../../core/models/group-definition.model';
 import { PreviewResult } from '../../../../core/models/preview-result.model';
 import { ReportDefinition } from '../../../../core/models/report-definition.model';
+import { SummaryDefinition } from '../../../../core/models/summary-definition.model';
 import { DatasetService } from '../../../../core/services/dataset.service';
 import { ReportService } from '../../../../core/services/report.service';
 import { FieldSelectorComponent } from '../../components/field-selector/field-selector.component';
@@ -50,6 +51,8 @@ export class ReportBuilderPageComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   protected datasets: Dataset[] = [];
+  protected selectedDataset: Dataset | null = null;
+  protected datasetRuleHints: string[] = [];
   protected availableFields: Field[] = [];
   protected selectedFields: Field[] = [];
   protected selectedDatasetId: string | null = null;
@@ -59,7 +62,8 @@ export class ReportBuilderPageComponent implements OnInit {
   protected datasetsLoadError: string | null = null;
   protected fieldsLoadError: string | null = null;
   protected previewLoading = false;
-  protected previewError: string | null = null;
+  protected previewErrorTitle: string | null = null;
+  protected previewErrors: string[] = [];
   protected previewResult: PreviewResult | null = null;
   protected hasPreviewRun = false;
 
@@ -83,6 +87,8 @@ export class ReportBuilderPageComponent implements OnInit {
 
   protected onDatasetChange(datasetId: string | null): void {
     this.selectedDatasetId = datasetId;
+    this.selectedDataset = this.datasets.find((dataset) => dataset.id === datasetId) ?? null;
+    this.datasetRuleHints = this.buildDatasetRuleHints(this.selectedDataset);
     this.fieldsLoadError = null;
     this.availableFields = [];
     this.selectedFields = [];
@@ -123,24 +129,37 @@ export class ReportBuilderPageComponent implements OnInit {
   }
 
   protected onGroupingChanged(grouping: GroupDefinition[]): void {
+    const shouldClearSummaries = grouping.length === 0;
+
     this.reportDefinition = {
       ...this.reportDefinition,
-      grouping
+      grouping,
+      summaries: shouldClearSummaries ? [] : this.reportDefinition.summaries
+    };
+  }
+
+  protected onSummariesChanged(summaries: SummaryDefinition[]): void {
+    this.reportDefinition = {
+      ...this.reportDefinition,
+      summaries
     };
   }
 
   protected runPreview(): void {
     this.hasPreviewRun = true;
-    this.previewError = null;
+    this.previewErrorTitle = null;
+    this.previewErrors = [];
 
     if (!this.reportDefinition.datasetId) {
-      this.previewError = 'Select a dataset before running preview.';
+      this.previewErrorTitle = 'Preview could not be run';
+      this.previewErrors = ['Select a dataset before running preview.'];
       this.previewResult = null;
       return;
     }
 
     if (this.reportDefinition.fields.length === 0) {
-      this.previewError = 'Select at least one field before running preview.';
+      this.previewErrorTitle = 'Preview could not be run';
+      this.previewErrors = ['Select at least one field before running preview.'];
       this.previewResult = null;
       return;
     }
@@ -158,11 +177,14 @@ export class ReportBuilderPageComponent implements OnInit {
       .subscribe({
         next: (result) => {
           this.previewResult = result;
-          this.previewError = null;
+          this.previewErrorTitle = null;
+          this.previewErrors = [];
         },
         error: (error: unknown) => {
           this.previewResult = null;
-          this.previewError = this.toPreviewErrorMessage(error);
+          const previewErrorState = this.toPreviewErrorState(error);
+          this.previewErrorTitle = previewErrorState.title;
+          this.previewErrors = previewErrorState.errors;
         }
       });
   }
@@ -217,14 +239,18 @@ export class ReportBuilderPageComponent implements OnInit {
 
   private resetPreviewState(): void {
     this.previewLoading = false;
-    this.previewError = null;
+    this.previewErrorTitle = null;
+    this.previewErrors = [];
     this.previewResult = null;
     this.hasPreviewRun = false;
   }
 
-  private toPreviewErrorMessage(error: unknown): string {
+  private toPreviewErrorState(error: unknown): { title: string; errors: string[] } {
     if (!(error instanceof HttpErrorResponse)) {
-      return 'Unable to run preview due to an unexpected error.';
+      return {
+        title: 'Preview could not be run',
+        errors: ['Unable to run preview due to an unexpected error.']
+      };
     }
 
     const payload = error.error as {
@@ -233,13 +259,47 @@ export class ReportBuilderPageComponent implements OnInit {
     } | null;
 
     if (payload?.errors && payload.errors.length > 0) {
-      return payload.errors.join(' ');
+      return {
+        title: payload.message ?? 'Preview could not be run',
+        errors: payload.errors
+      };
     }
 
     if (payload?.message) {
-      return payload.message;
+      return {
+        title: 'Preview could not be run',
+        errors: [payload.message]
+      };
     }
 
-    return 'Unable to run preview due to an unexpected error.';
+    return {
+      title: 'Preview could not be run',
+      errors: ['Unable to run preview due to an unexpected error.']
+    };
+  }
+
+  private buildDatasetRuleHints(dataset: Dataset | null): string[] {
+    if (!dataset) {
+      return [];
+    }
+
+    const hints: string[] = [];
+    if (dataset.requireAtLeastOneFilter) {
+      hints.push('At least one filter is required for this dataset.');
+    }
+
+    if (dataset.requireDateFilter) {
+      hints.push('A date filter is required for this dataset.');
+    }
+
+    if (dataset.previewRowLimit) {
+      hints.push(`Preview limited to ${dataset.previewRowLimit} rows.`);
+    }
+
+    if (dataset.timeoutSeconds) {
+      hints.push(`Preview timeout is ${dataset.timeoutSeconds} seconds.`);
+    }
+
+    return hints;
   }
 }

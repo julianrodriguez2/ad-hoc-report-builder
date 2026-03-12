@@ -21,9 +21,15 @@ export class PreviewGridComponent {
 
   @Input() loading = false;
 
-  @Input() errorMessage: string | null = null;
+  @Input() errorTitle: string | null = null;
+
+  @Input() errorMessages: string[] = [];
 
   @Input() isTruncated = false;
+
+  @Input() appliedRowLimit: number | null = null;
+
+  @Input() executionTimeMs: number | null = null;
 
   @Input() hasAttemptedPreview = false;
 
@@ -35,5 +41,9 @@ export class PreviewGridComponent {
 
   protected readCellValue(row: Record<string, unknown>, fieldName: string): unknown {
     return row[fieldName] ?? '';
+  }
+
+  protected hasErrors(): boolean {
+    return this.errorMessages.length > 0;
   }
 }

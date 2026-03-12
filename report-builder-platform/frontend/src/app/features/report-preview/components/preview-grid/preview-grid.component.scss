@@ -26,6 +26,18 @@
   text-align: center;
 }
 
+.error-state {
+  align-items: stretch;
+  text-align: left;
+}
+
+.error-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: #b91c1c;
+  font-size: 0.86rem;
+}
+
 .preview-warning {
   margin: 0;
   font-size: 0.82rem;
@@ -34,6 +46,12 @@
   border: 1px solid #fed7aa;
   border-radius: 6px;
   padding: 0.35rem 0.55rem;
+}
+
+.preview-meta {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #64748b;
 }
 
 :host ::ng-deep .p-table {

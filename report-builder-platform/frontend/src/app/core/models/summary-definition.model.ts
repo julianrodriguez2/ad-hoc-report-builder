@@ -1,5 +1,9 @@
+export type SummaryAggregation = 'count' | 'sum' | 'avg' | 'min' | 'max';
+
 export interface SummaryDefinition {
   fieldName: string;
-  operation: 'sum' | 'avg' | 'min' | 'max' | 'count';
-  alias?: string;
+  displayName: string;
+  aggregation: SummaryAggregation;
+  alias: string;
+  summaryOrder: number;
 }

@@ -11,8 +11,10 @@ public static class AppDbInitializer
     public static async Task SeedMetadataAsync(AppDbContext dbContext, CancellationToken cancellationToken = default)
     {
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
+        await EnsureDatasetGuardrailColumnsAsync(dbContext, cancellationToken);
 
         var createdAt = DateTime.UtcNow;
+        var hasDatasetUpdates = false;
 
         var permitsDataset = await dbContext.Datasets
             .FirstOrDefaultAsync(dataset => dataset.Name == "Permits", cancellationToken);
@@ -24,10 +26,28 @@ public static class AppDbInitializer
                 Name = "Permits",
                 Description = "Permit reporting dataset",
                 ViewName = "vw_permits_reporting",
-                CreatedAt = createdAt
+                CreatedAt = createdAt,
+                PreviewRowLimit = 100,
+                MaxExecutionRowLimit = 10000,
+                RequireAtLeastOneFilter = false,
+                RequireDateFilter = false,
+                LargeDatasetThreshold = 50000,
+                TimeoutSeconds = 10
             };
 
             await dbContext.Datasets.AddAsync(permitsDataset, cancellationToken);
+            hasDatasetUpdates = true;
+        }
+        else
+        {
+            hasDatasetUpdates |= ApplyDatasetGuardrails(
+                permitsDataset,
+                previewRowLimit: 100,
+                maxExecutionRowLimit: 10000,
+                requireAtLeastOneFilter: false,
+                requireDateFilter: false,
+                largeDatasetThreshold: 50000,
+                timeoutSeconds: 10);
         }
 
         var inspectionsDataset = await dbContext.Datasets
@@ -40,13 +60,31 @@ public static class AppDbInitializer
                 Name = "Inspections",
                 Description = "Inspections reporting dataset",
                 ViewName = "vw_inspections_reporting",
-                CreatedAt = createdAt
+                CreatedAt = createdAt,
+                PreviewRowLimit = 100,
+                MaxExecutionRowLimit = 5000,
+                RequireAtLeastOneFilter = true,
+                RequireDateFilter = true,
+                LargeDatasetThreshold = 25000,
+                TimeoutSeconds = 10
             };
 
             await dbContext.Datasets.AddAsync(inspectionsDataset, cancellationToken);
+            hasDatasetUpdates = true;
+        }
+        else
+        {
+            hasDatasetUpdates |= ApplyDatasetGuardrails(
+                inspectionsDataset,
+                previewRowLimit: 100,
+                maxExecutionRowLimit: 5000,
+                requireAtLeastOneFilter: true,
+                requireDateFilter: true,
+                largeDatasetThreshold: 25000,
+                timeoutSeconds: 10);
         }
 
-        if (dbContext.ChangeTracker.HasChanges())
+        if (hasDatasetUpdates || dbContext.ChangeTracker.HasChanges())
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
@@ -65,7 +103,7 @@ public static class AppDbInitializer
                     DataType = "string",
                     IsFilterable = true,
                     IsGroupable = true,
-                    IsSummarizable = false
+                    IsSummarizable = true
                 },
                 new()
                 {
@@ -76,7 +114,7 @@ public static class AppDbInitializer
                     DataType = "string",
                     IsFilterable = true,
                     IsGroupable = true,
-                    IsSummarizable = false
+                    IsSummarizable = true
                 },
                 new()
                 {
@@ -87,7 +125,7 @@ public static class AppDbInitializer
                     DataType = "string",
                     IsFilterable = true,
                     IsGroupable = true,
-                    IsSummarizable = false
+                    IsSummarizable = true
                 },
                 new()
                 {
@@ -98,7 +136,7 @@ public static class AppDbInitializer
                     DataType = "date",
                     IsFilterable = true,
                     IsGroupable = true,
-                    IsSummarizable = false
+                    IsSummarizable = true
                 },
                 new()
                 {
@@ -109,7 +147,18 @@ public static class AppDbInitializer
                     DataType = "string",
                     IsFilterable = true,
                     IsGroupable = true,
-                    IsSummarizable = false
+                    IsSummarizable = true
+                },
+                new()
+                {
+                    Id = Guid.Parse("FBD5B3B4-F9D4-4B32-BCC2-56A1D65C31D7"),
+                    DatasetId = permitsDataset.Id,
+                    FieldName = "FeeAmount",
+                    DisplayName = "Fee Amount",
+                    DataType = "number",
+                    IsFilterable = true,
+                    IsGroupable = false,
+                    IsSummarizable = true
                 }
             },
             cancellationToken);
@@ -128,7 +177,7 @@ public static class AppDbInitializer
                     DataType = "string",
                     IsFilterable = true,
                     IsGroupable = false,
-                    IsSummarizable = false
+                    IsSummarizable = true
                 },
                 new()
                 {
@@ -139,7 +188,7 @@ public static class AppDbInitializer
                     DataType = "string",
                     IsFilterable = true,
                     IsGroupable = true,
-                    IsSummarizable = false
+                    IsSummarizable = true
                 },
                 new()
                 {
@@ -150,7 +199,7 @@ public static class AppDbInitializer
                     DataType = "date",
                     IsFilterable = true,
                     IsGroupable = true,
-                    IsSummarizable = false
+                    IsSummarizable = true
                 },
                 new()
                 {
@@ -161,12 +210,118 @@ public static class AppDbInitializer
                     DataType = "string",
                     IsFilterable = true,
                     IsGroupable = true,
-                    IsSummarizable = false
+                    IsSummarizable = true
                 }
             },
             cancellationToken);
 
         await SeedPreviewViewsAndSampleRowsAsync(dbContext, cancellationToken);
+    }
+
+    private static bool ApplyDatasetGuardrails(
+        Dataset dataset,
+        int previewRowLimit,
+        int maxExecutionRowLimit,
+        bool requireAtLeastOneFilter,
+        bool requireDateFilter,
+        int? largeDatasetThreshold,
+        int timeoutSeconds)
+    {
+        var hasUpdates = false;
+
+        if (dataset.PreviewRowLimit != previewRowLimit)
+        {
+            dataset.PreviewRowLimit = previewRowLimit;
+            hasUpdates = true;
+        }
+
+        if (dataset.MaxExecutionRowLimit != maxExecutionRowLimit)
+        {
+            dataset.MaxExecutionRowLimit = maxExecutionRowLimit;
+            hasUpdates = true;
+        }
+
+        if (dataset.RequireAtLeastOneFilter != requireAtLeastOneFilter)
+        {
+            dataset.RequireAtLeastOneFilter = requireAtLeastOneFilter;
+            hasUpdates = true;
+        }
+
+        if (dataset.RequireDateFilter != requireDateFilter)
+        {
+            dataset.RequireDateFilter = requireDateFilter;
+            hasUpdates = true;
+        }
+
+        if (dataset.LargeDatasetThreshold != largeDatasetThreshold)
+        {
+            dataset.LargeDatasetThreshold = largeDatasetThreshold;
+            hasUpdates = true;
+        }
+
+        if (dataset.TimeoutSeconds != timeoutSeconds)
+        {
+            dataset.TimeoutSeconds = timeoutSeconds;
+            hasUpdates = true;
+        }
+
+        return hasUpdates;
+    }
+
+    private static async Task EnsureDatasetGuardrailColumnsAsync(AppDbContext dbContext, CancellationToken cancellationToken)
+    {
+        const string ensurePreviewRowLimitColumnSql = """
+            IF COL_LENGTH('dbo.Datasets', 'PreviewRowLimit') IS NULL
+            BEGIN
+                ALTER TABLE dbo.Datasets ADD PreviewRowLimit INT NULL;
+            END
+            """;
+
+        const string ensureMaxExecutionRowLimitColumnSql = """
+            IF COL_LENGTH('dbo.Datasets', 'MaxExecutionRowLimit') IS NULL
+            BEGIN
+                ALTER TABLE dbo.Datasets ADD MaxExecutionRowLimit INT NULL;
+            END
+            """;
+
+        const string ensureRequireAtLeastOneFilterColumnSql = """
+            IF COL_LENGTH('dbo.Datasets', 'RequireAtLeastOneFilter') IS NULL
+            BEGIN
+                ALTER TABLE dbo.Datasets
+                ADD RequireAtLeastOneFilter BIT NOT NULL
+                    CONSTRAINT DF_Datasets_RequireAtLeastOneFilter DEFAULT(0);
+            END
+            """;
+
+        const string ensureRequireDateFilterColumnSql = """
+            IF COL_LENGTH('dbo.Datasets', 'RequireDateFilter') IS NULL
+            BEGIN
+                ALTER TABLE dbo.Datasets
+                ADD RequireDateFilter BIT NOT NULL
+                    CONSTRAINT DF_Datasets_RequireDateFilter DEFAULT(0);
+            END
+            """;
+
+        const string ensureLargeDatasetThresholdColumnSql = """
+            IF COL_LENGTH('dbo.Datasets', 'LargeDatasetThreshold') IS NULL
+            BEGIN
+                ALTER TABLE dbo.Datasets ADD LargeDatasetThreshold INT NULL;
+            END
+            """;
+
+        const string ensureTimeoutSecondsColumnSql = """
+            IF COL_LENGTH('dbo.Datasets', 'TimeoutSeconds') IS NULL
+            BEGIN
+                ALTER TABLE dbo.Datasets ADD TimeoutSeconds INT NULL;
+            END
+            """;
+
+        await dbContext.Database.ExecuteSqlRawAsync(ensurePreviewRowLimitColumnSql, cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(ensureMaxExecutionRowLimitColumnSql, cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(ensureRequireAtLeastOneFilterColumnSql, cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(ensureRequireDateFilterColumnSql, cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(ensureLargeDatasetThresholdColumnSql, cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(ensureTimeoutSecondsColumnSql, cancellationToken);
     }
 
     private static async Task SeedFieldsForDatasetAsync(
@@ -175,23 +330,63 @@ public static class AppDbInitializer
         IEnumerable<DatasetField> seededFields,
         CancellationToken cancellationToken)
     {
-        var existingFieldNames = await dbContext.DatasetFields
-            .AsNoTracking()
+        var existingFields = await dbContext.DatasetFields
             .Where(field => field.DatasetId == datasetId)
-            .Select(field => field.FieldName)
             .ToListAsync(cancellationToken);
 
-        var missingFields = seededFields
-            .Where(field => !existingFieldNames.Contains(field.FieldName, StringComparer.OrdinalIgnoreCase))
-            .ToList();
+        var existingFieldMap = existingFields.ToDictionary(field => field.FieldName, StringComparer.OrdinalIgnoreCase);
+        var missingFields = new List<DatasetField>();
+        var hasUpdates = false;
 
-        if (missingFields.Count == 0)
+        foreach (var seededField in seededFields)
         {
-            return;
+            if (!existingFieldMap.TryGetValue(seededField.FieldName, out var existingField))
+            {
+                missingFields.Add(seededField);
+                continue;
+            }
+
+            if (existingField.DisplayName != seededField.DisplayName)
+            {
+                existingField.DisplayName = seededField.DisplayName;
+                hasUpdates = true;
+            }
+
+            if (existingField.DataType != seededField.DataType)
+            {
+                existingField.DataType = seededField.DataType;
+                hasUpdates = true;
+            }
+
+            if (existingField.IsFilterable != seededField.IsFilterable)
+            {
+                existingField.IsFilterable = seededField.IsFilterable;
+                hasUpdates = true;
+            }
+
+            if (existingField.IsGroupable != seededField.IsGroupable)
+            {
+                existingField.IsGroupable = seededField.IsGroupable;
+                hasUpdates = true;
+            }
+
+            if (existingField.IsSummarizable != seededField.IsSummarizable)
+            {
+                existingField.IsSummarizable = seededField.IsSummarizable;
+                hasUpdates = true;
+            }
         }
 
-        await dbContext.DatasetFields.AddRangeAsync(missingFields, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        if (missingFields.Count > 0)
+        {
+            await dbContext.DatasetFields.AddRangeAsync(missingFields, cancellationToken);
+            hasUpdates = true;
+        }
+
+        if (hasUpdates)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private static async Task SeedPreviewViewsAndSampleRowsAsync(AppDbContext dbContext, CancellationToken cancellationToken)
@@ -205,8 +400,17 @@ public static class AppDbInitializer
                     ApplicantName NVARCHAR(150) NOT NULL,
                     PermitType NVARCHAR(100) NOT NULL,
                     IssueDate DATE NOT NULL,
-                    Status NVARCHAR(50) NOT NULL
+                    Status NVARCHAR(50) NOT NULL,
+                    FeeAmount DECIMAL(18,2) NULL
                 );
+            END
+            """;
+
+        const string ensurePermitsFeeAmountColumnSql = """
+            IF COL_LENGTH('dbo.PermitsPreviewData', 'FeeAmount') IS NULL
+            BEGIN
+                ALTER TABLE dbo.PermitsPreviewData
+                ADD FeeAmount DECIMAL(18,2) NULL;
             END
             """;
 
@@ -226,12 +430,23 @@ public static class AppDbInitializer
         const string seedPermitsRowsSql = """
             IF NOT EXISTS (SELECT 1 FROM dbo.PermitsPreviewData)
             BEGIN
-                INSERT INTO dbo.PermitsPreviewData (PermitNumber, ApplicantName, PermitType, IssueDate, Status)
+                INSERT INTO dbo.PermitsPreviewData (PermitNumber, ApplicantName, PermitType, IssueDate, Status, FeeAmount)
                 VALUES
-                    ('PR-1001', 'Jane Doe', 'Residential', '2024-01-05', 'Active'),
-                    ('PR-1002', 'Acme Builders', 'Commercial', '2024-01-12', 'Pending'),
-                    ('PR-1003', 'Northside Holdings', 'Signage', '2024-02-01', 'Active');
+                    ('PR-1001', 'Jane Doe', 'Residential', '2024-01-05', 'Active', 250.00),
+                    ('PR-1002', 'Acme Builders', 'Commercial', '2024-01-12', 'Pending', 1800.00),
+                    ('PR-1003', 'Northside Holdings', 'Signage', '2024-02-01', 'Active', 475.50);
             END
+            """;
+
+        const string updatePermitsFeeAmountSql = """
+            UPDATE dbo.PermitsPreviewData
+            SET FeeAmount = CASE PermitNumber
+                WHEN 'PR-1001' THEN 250.00
+                WHEN 'PR-1002' THEN 1800.00
+                WHEN 'PR-1003' THEN 475.50
+                ELSE ISNULL(FeeAmount, 0.00)
+            END
+            WHERE FeeAmount IS NULL;
             """;
 
         const string seedInspectionsRowsSql = """
@@ -253,7 +468,8 @@ public static class AppDbInitializer
                 ApplicantName,
                 PermitType,
                 IssueDate,
-                Status
+                Status,
+                FeeAmount
             FROM dbo.PermitsPreviewData;
             """;
 
@@ -271,8 +487,10 @@ public static class AppDbInitializer
         try
         {
             await dbContext.Database.ExecuteSqlRawAsync(createPermitsTableSql, cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(ensurePermitsFeeAmountColumnSql, cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(createInspectionsTableSql, cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(seedPermitsRowsSql, cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(updatePermitsFeeAmountSql, cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(seedInspectionsRowsSql, cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(createPermitsViewSql, cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(createInspectionsViewSql, cancellationToken);

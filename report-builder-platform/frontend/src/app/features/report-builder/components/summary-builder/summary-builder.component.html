@@ -1,10 +1,102 @@
-<p-panel header="Summary Builder">
-  <div class="summary-list">
-    @for (summary of summaries; track summary.fieldName + summary.operation) {
-      <div class="summary-item">
-        <span>{{ summary.operation | uppercase }}</span>
-        <strong>{{ summary.fieldName }}</strong>
+<p-panel>
+  <ng-template pTemplate="header">
+    <div class="panel-header">
+      <div class="panel-heading">
+        <h3>Summaries</h3>
+        <p>Add aggregate metrics such as counts or totals.</p>
       </div>
-    }
-  </div>
+    </div>
+  </ng-template>
+
+  @if (!hasSummarizableFields()) {
+    <p class="placeholder-message">Select a dataset with summarizable fields to configure summaries.</p>
+  } @else if (!hasGrouping()) {
+    <p class="placeholder-message">Add at least one grouping field before configuring summaries.</p>
+  } @else {
+    <div class="summary-grid">
+      <section class="summary-column">
+        <h4 class="column-title">Available Summary Fields</h4>
+        <div class="available-list">
+          @for (field of availableSummaryFields(); track field.fieldName) {
+            <div class="available-row">
+              <span class="field-name">{{ field.displayName }}</span>
+              <button
+                pButton
+                type="button"
+                icon="pi pi-plus"
+                text
+                rounded
+                severity="secondary"
+                aria-label="Add summary"
+                (click)="addSummaryForField(field)"
+              ></button>
+            </div>
+          }
+        </div>
+      </section>
+
+      <section class="summary-column">
+        <h4 class="column-title">Selected Summaries</h4>
+        <div cdkDropList [cdkDropListData]="selectedSummaries" class="selected-list" (cdkDropListDropped)="onDrop($event)">
+          @if (selectedSummaries.length === 0) {
+            <p class="empty-state">No summaries configured.</p>
+          } @else {
+            @for (summary of selectedSummaries; track trackBySummary($index, summary)) {
+              <div class="summary-row" cdkDrag>
+                <span class="drag-handle" cdkDragHandle>
+                  <i class="pi pi-bars"></i>
+                </span>
+
+                <p-dropdown
+                  [options]="aggregationOptions(summary)"
+                  optionLabel="label"
+                  optionValue="value"
+                  [ngModel]="summary.aggregation"
+                  appendTo="body"
+                  styleClass="aggregation-dropdown"
+                  (onChange)="onAggregationChanged($index, $event.value)"
+                ></p-dropdown>
+
+                <p-dropdown
+                  [options]="fieldOptions()"
+                  optionLabel="label"
+                  optionValue="value"
+                  [ngModel]="summary.fieldName"
+                  appendTo="body"
+                  styleClass="field-dropdown"
+                  (onChange)="onFieldChanged($index, $event.value)"
+                ></p-dropdown>
+
+                <input
+                  pInputText
+                  type="text"
+                  [ngModel]="summary.alias"
+                  class="alias-input"
+                  placeholder="Alias"
+                  (ngModelChange)="onAliasChanged($index, $event)"
+                />
+
+                <button
+                  pButton
+                  type="button"
+                  icon="pi pi-times"
+                  text
+                  rounded
+                  severity="secondary"
+                  aria-label="Remove summary"
+                  (click)="removeSummary($index)"
+                ></button>
+              </div>
+
+              @if (aliasValidationMessage($index); as aliasError) {
+                <p class="row-error">{{ aliasError }}</p>
+              }
+            }
+          }
+        </div>
+      </section>
+    </div>
+  }
+
+  <p class="helper-note">Summaries calculate aggregated metrics such as totals or counts.</p>
 </p-panel>

@@ -21,6 +21,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(x => x.Description).HasMaxLength(1000).IsRequired();
             entity.Property(x => x.ViewName).HasMaxLength(200).IsRequired();
             entity.Property(x => x.CreatedAt).IsRequired();
+            entity.Property(x => x.PreviewRowLimit);
+            entity.Property(x => x.MaxExecutionRowLimit);
+            entity.Property(x => x.RequireAtLeastOneFilter).HasDefaultValue(false);
+            entity.Property(x => x.RequireDateFilter).HasDefaultValue(false);
+            entity.Property(x => x.LargeDatasetThreshold);
+            entity.Property(x => x.TimeoutSeconds);
         });
 
         modelBuilder.Entity<DatasetField>(entity =>

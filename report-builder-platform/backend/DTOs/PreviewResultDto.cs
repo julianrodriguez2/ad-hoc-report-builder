@@ -10,5 +10,9 @@ public class PreviewResultDto
 
     public bool IsTruncated { get; set; }
 
+    public int AppliedRowLimit { get; set; }
+
+    public long? ExecutionTimeMs { get; set; }
+
     public string? DebugSql { get; set; }
 }

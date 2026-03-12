@@ -6,9 +6,11 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+builder.Services.Configure<ReportingOptions>(builder.Configuration.GetSection("Reporting"));
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<IReportQueryBuilderService, ReportQueryBuilderService>();
+builder.Services.AddScoped<IReportGuardrailService, ReportGuardrailService>();
 builder.Services.AddScoped<IReportPreviewService, ReportPreviewService>();
 builder.Services.AddScoped<IDatasetRepository, DatasetRepository>();
 builder.Services.AddScoped<ISavedReportRepository, SavedReportRepository>();

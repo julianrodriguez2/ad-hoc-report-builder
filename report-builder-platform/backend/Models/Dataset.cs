@@ -12,5 +12,17 @@ public class Dataset
 
     public DateTime CreatedAt { get; set; }
 
+    public int? PreviewRowLimit { get; set; }
+
+    public int? MaxExecutionRowLimit { get; set; }
+
+    public bool RequireAtLeastOneFilter { get; set; }
+
+    public bool RequireDateFilter { get; set; }
+
+    public int? LargeDatasetThreshold { get; set; }
+
+    public int? TimeoutSeconds { get; set; }
+
     public ICollection<DatasetField> Fields { get; set; } = new List<DatasetField>();
 }

@@ -10,7 +10,7 @@ public class ReportValidationException : Exception
     }
 
     public ReportValidationException(IReadOnlyList<string> errors)
-        : base("Report definition validation failed.")
+        : base("Report validation failed.")
     {
         Errors = errors;
     }

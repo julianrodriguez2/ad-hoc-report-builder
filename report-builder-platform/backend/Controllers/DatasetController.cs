@@ -19,7 +19,13 @@ public class DatasetController(IDatasetRepository datasetRepository) : Controlle
         {
             Id = dataset.Id,
             Name = dataset.Name,
-            Description = dataset.Description
+            Description = dataset.Description,
+            PreviewRowLimit = dataset.PreviewRowLimit,
+            MaxExecutionRowLimit = dataset.MaxExecutionRowLimit,
+            RequireAtLeastOneFilter = dataset.RequireAtLeastOneFilter,
+            RequireDateFilter = dataset.RequireDateFilter,
+            LargeDatasetThreshold = dataset.LargeDatasetThreshold,
+            TimeoutSeconds = dataset.TimeoutSeconds
         });
 
         return Ok(response);

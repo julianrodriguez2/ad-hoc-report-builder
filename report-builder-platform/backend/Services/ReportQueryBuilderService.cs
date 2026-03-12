@@ -43,6 +43,26 @@ public class ReportQueryBuilderService(AppDbContext dbContext) : IReportQueryBui
         }
     };
 
+    private static readonly Dictionary<string, HashSet<string>> AllowedAggregationsByDataType = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["string"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "count", "min", "max"
+        },
+        ["number"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "count", "sum", "avg", "min", "max"
+        },
+        ["date"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "count", "min", "max"
+        },
+        ["boolean"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "count"
+        }
+    };
+
     // Example definitions for local testing:
     // 1) Dataset Permits -> Fields PermitNumber, ApplicantName -> Filter Status equals Active
     // 2) Dataset Permits -> Fields PermitNumber, IssueDate -> Filter IssueDate after 2024-01-01
@@ -61,18 +81,20 @@ public class ReportQueryBuilderService(AppDbContext dbContext) : IReportQueryBui
         var requestedFields = definition.Fields ?? [];
         var requestedFilters = definition.Filters ?? [];
         var requestedGrouping = definition.Grouping ?? [];
+        var requestedSummaries = definition.Summaries ?? [];
 
         var selectedFields = ValidateFieldSelection(requestedFields, datasetFieldMap);
         var validatedFilters = ValidateFilters(requestedFilters, datasetFieldMap);
         var validatedGrouping = ValidateGrouping(requestedGrouping, datasetFieldMap);
-        ValidateGroupingSelectionCompatibility(selectedFields, validatedGrouping);
+        var validatedSummaries = ValidateSummaries(requestedSummaries, datasetFieldMap, validatedGrouping);
+        ValidateGroupingSelectionCompatibility(selectedFields, validatedGrouping, validatedSummaries);
 
         var parameters = new Dictionary<string, object?>();
-        var selectClause = BuildSelectClause(selectedFields);
+        var selectClause = BuildSelectClause(selectedFields, validatedGrouping, validatedSummaries);
         var fromClause = $"FROM {QuoteIdentifierIfNeeded(dataset.ViewName, allowPath: true)}";
         var whereClause = BuildWhereClause(validatedFilters, parameters);
         var groupByClause = BuildGroupByClause(validatedGrouping);
-        var orderByClause = BuildOrderByClause(selectedFields, validatedGrouping);
+        var orderByClause = BuildOrderByClause(selectedFields, validatedGrouping, validatedSummaries);
 
         var sqlParts = new List<string> { selectClause, fromClause };
         if (!string.IsNullOrWhiteSpace(whereClause))
@@ -280,9 +302,103 @@ public class ReportQueryBuilderService(AppDbContext dbContext) : IReportQueryBui
         return validatedGrouping;
     }
 
+    private List<ValidatedSummary> ValidateSummaries(
+        IReadOnlyList<SummaryDefinitionDto> summaries,
+        IReadOnlyDictionary<string, DatasetField> datasetFieldMap,
+        IReadOnlyList<ValidatedGrouping> grouping)
+    {
+        if (summaries.Count == 0)
+        {
+            return [];
+        }
+
+        if (grouping.Count == 0)
+        {
+            throw new ReportValidationException("Summaries currently require at least one grouping field.");
+        }
+
+        var normalizedSummaries = NormalizeSummaries(summaries);
+        var errors = new List<string>();
+        var validatedSummaries = new List<ValidatedSummary>();
+        var seenAliases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var index = 0; index < normalizedSummaries.Count; index++)
+        {
+            var summary = normalizedSummaries[index];
+            var fieldName = summary.FieldName?.Trim();
+            if (string.IsNullOrWhiteSpace(fieldName))
+            {
+                errors.Add($"Summary at index {index} is missing FieldName.");
+                continue;
+            }
+
+            if (!datasetFieldMap.TryGetValue(fieldName, out var metadataField))
+            {
+                errors.Add($"Summary field '{fieldName}' does not belong to the selected dataset.");
+                continue;
+            }
+
+            if (!metadataField.IsSummarizable)
+            {
+                errors.Add($"Field '{fieldName}' is not marked as summarizable in metadata.");
+                continue;
+            }
+
+            var aggregation = summary.Aggregation?.Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(aggregation))
+            {
+                errors.Add($"Summary for field '{fieldName}' is missing an aggregation.");
+                continue;
+            }
+
+            var normalizedDataType = NormalizeDataType(metadataField.DataType);
+            if (!ValidateAggregationForType(normalizedDataType, aggregation))
+            {
+                errors.Add(
+                    $"Aggregation '{aggregation}' is not allowed for summary field '{fieldName}' with data type '{normalizedDataType}'.");
+                continue;
+            }
+
+            var alias = summary.Alias?.Trim();
+            if (string.IsNullOrWhiteSpace(alias))
+            {
+                errors.Add($"Summary for field '{fieldName}' is missing Alias.");
+                continue;
+            }
+
+            if (!SqlIdentifierPattern.IsMatch(alias))
+            {
+                errors.Add($"Summary alias '{alias}' is invalid. Use letters, numbers, and underscores only.");
+                continue;
+            }
+
+            if (datasetFieldMap.ContainsKey(alias))
+            {
+                errors.Add($"Summary alias '{alias}' cannot match an existing dataset field name.");
+                continue;
+            }
+
+            if (!seenAliases.Add(alias))
+            {
+                errors.Add($"Summary alias '{alias}' is duplicated.");
+                continue;
+            }
+
+            validatedSummaries.Add(new ValidatedSummary(metadataField, aggregation, alias, index + 1));
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new ReportValidationException(errors);
+        }
+
+        return validatedSummaries;
+    }
+
     private static void ValidateGroupingSelectionCompatibility(
         IReadOnlyList<DatasetField> selectedFields,
-        IReadOnlyList<ValidatedGrouping> grouping)
+        IReadOnlyList<ValidatedGrouping> grouping,
+        IReadOnlyList<ValidatedSummary> summaries)
     {
         if (grouping.Count == 0)
         {
@@ -292,7 +408,9 @@ public class ReportQueryBuilderService(AppDbContext dbContext) : IReportQueryBui
         if (selectedFields.Count != grouping.Count)
         {
             throw new ReportValidationException(
-                "When grouping is used, selected fields must currently match grouped fields until summary fields are implemented.");
+                summaries.Count > 0
+                    ? "When summaries are used, selected fields must match grouped fields."
+                    : "When grouping is used without summaries, selected fields must match grouped fields.");
         }
 
         var selectedFieldSet = new HashSet<string>(selectedFields.Select(field => field.FieldName), StringComparer.OrdinalIgnoreCase);
@@ -301,7 +419,9 @@ public class ReportQueryBuilderService(AppDbContext dbContext) : IReportQueryBui
         if (!selectedFieldSet.SetEquals(groupingFieldSet))
         {
             throw new ReportValidationException(
-                "When grouping is used, selected fields must currently match grouped fields until summary fields are implemented.");
+                summaries.Count > 0
+                    ? "When summaries are used, selected fields must match grouped fields."
+                    : "When grouping is used without summaries, selected fields must match grouped fields.");
         }
     }
 
@@ -369,10 +489,48 @@ public class ReportQueryBuilderService(AppDbContext dbContext) : IReportQueryBui
         return validatedFilters;
     }
 
-    private static string BuildSelectClause(IReadOnlyList<DatasetField> selectedFields)
+    private static string BuildSelectClause(
+        IReadOnlyList<DatasetField> selectedFields,
+        IReadOnlyList<ValidatedGrouping> grouping,
+        IReadOnlyList<ValidatedSummary> summaries)
     {
-        var selectColumns = selectedFields.Select(field => QuoteIdentifierIfNeeded(field.FieldName));
+        if (summaries.Count == 0)
+        {
+            var selectedColumns = selectedFields.Select(field => QuoteIdentifierIfNeeded(field.FieldName));
+            return $"SELECT {string.Join(", ", selectedColumns)}";
+        }
+
+        var groupingColumns = grouping
+            .OrderBy(group => group.GroupOrder)
+            .Select(group => QuoteIdentifierIfNeeded(group.Field.FieldName));
+
+        var summaryColumns = BuildSummarySelectClause(summaries);
+        var selectColumns = groupingColumns.Concat(summaryColumns);
+
         return $"SELECT {string.Join(", ", selectColumns)}";
+    }
+
+    private static IReadOnlyList<string> BuildSummarySelectClause(IReadOnlyList<ValidatedSummary> summaries)
+    {
+        return summaries
+            .OrderBy(summary => summary.SummaryOrder)
+            .Select(summary =>
+            {
+                var quotedField = QuoteIdentifierIfNeeded(summary.Field.FieldName);
+                var quotedAlias = QuoteIdentifierIfNeeded(summary.Alias);
+
+                return summary.Aggregation switch
+                {
+                    "count" => $"COUNT({quotedField}) AS {quotedAlias}",
+                    "sum" => $"SUM({quotedField}) AS {quotedAlias}",
+                    "avg" => $"AVG({quotedField}) AS {quotedAlias}",
+                    "min" => $"MIN({quotedField}) AS {quotedAlias}",
+                    "max" => $"MAX({quotedField}) AS {quotedAlias}",
+                    _ => throw new ReportValidationException(
+                        $"Unsupported aggregation '{summary.Aggregation}' for summary field '{summary.Field.FieldName}'.")
+                };
+            })
+            .ToList();
     }
 
     private static string BuildGroupByClause(IReadOnlyList<ValidatedGrouping> grouping)
@@ -391,7 +549,8 @@ public class ReportQueryBuilderService(AppDbContext dbContext) : IReportQueryBui
 
     private static string BuildOrderByClause(
         IReadOnlyList<DatasetField> selectedFields,
-        IReadOnlyList<ValidatedGrouping> grouping)
+        IReadOnlyList<ValidatedGrouping> grouping,
+        IReadOnlyList<ValidatedSummary> summaries)
     {
         if (grouping.Count > 0)
         {
@@ -400,6 +559,11 @@ public class ReportQueryBuilderService(AppDbContext dbContext) : IReportQueryBui
                 .Select(group => $"{QuoteIdentifierIfNeeded(group.Field.FieldName)} {group.SortDirection.ToUpperInvariant()}");
 
             return $"ORDER BY {string.Join(", ", orderedGroups)}";
+        }
+
+        if (summaries.Count > 0)
+        {
+            throw new ReportValidationException("Summaries currently require at least one grouping field.");
         }
 
         return $"ORDER BY {QuoteIdentifierIfNeeded(selectedFields[0].FieldName)}";
@@ -499,6 +663,12 @@ public class ReportQueryBuilderService(AppDbContext dbContext) : IReportQueryBui
                allowedOperators.Contains(@operator);
     }
 
+    private static bool ValidateAggregationForType(string normalizedDataType, string aggregation)
+    {
+        return AllowedAggregationsByDataType.TryGetValue(normalizedDataType, out var allowedAggregations) &&
+               allowedAggregations.Contains(aggregation);
+    }
+
     private static bool RequiresValue(string @operator)
     {
         return !OperatorsWithoutValues.Contains(@operator);
@@ -516,6 +686,21 @@ public class ReportQueryBuilderService(AppDbContext dbContext) : IReportQueryBui
             .OrderBy(item => item.Order)
             .ThenBy(item => item.Index)
             .Select(item => item.Group)
+            .ToList();
+    }
+
+    private static List<SummaryDefinitionDto> NormalizeSummaries(IReadOnlyList<SummaryDefinitionDto> summaries)
+    {
+        return summaries
+            .Select((summary, index) => new
+            {
+                Summary = summary,
+                Index = index,
+                Order = summary.SummaryOrder <= 0 ? index + 1 : summary.SummaryOrder
+            })
+            .OrderBy(item => item.Order)
+            .ThenBy(item => item.Index)
+            .Select(item => item.Summary)
             .ToList();
     }
 
@@ -1007,4 +1192,10 @@ public class ReportQueryBuilderService(AppDbContext dbContext) : IReportQueryBui
         DatasetField Field,
         string SortDirection,
         int GroupOrder);
+
+    private sealed record ValidatedSummary(
+        DatasetField Field,
+        string Aggregation,
+        string Alias,
+        int SummaryOrder);
 }

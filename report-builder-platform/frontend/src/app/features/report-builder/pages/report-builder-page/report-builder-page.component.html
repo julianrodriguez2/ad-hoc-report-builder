@@ -19,6 +19,16 @@
           @if (datasetsLoadError) {
             <p class="status-message error">{{ datasetsLoadError }}</p>
           }
+          @if (datasetRuleHints.length > 0) {
+            <div class="dataset-rules">
+              <p class="dataset-rules-title">Dataset Rules</p>
+              <ul>
+                @for (hint of datasetRuleHints; track hint) {
+                  <li>{{ hint }}</li>
+                }
+              </ul>
+            </div>
+          }
         </p-panel>
 
         <app-field-selector
@@ -42,7 +52,12 @@
           [grouping]="reportDefinition.grouping"
           (groupingChanged)="onGroupingChanged($event)"
         ></app-grouping-builder>
-        <app-summary-builder></app-summary-builder>
+        <app-summary-builder
+          [availableFields]="availableFields"
+          [summaries]="reportDefinition.summaries"
+          [grouping]="reportDefinition.grouping"
+          (summariesChanged)="onSummariesChanged($event)"
+        ></app-summary-builder>
       </div>
     </ng-template>
 
@@ -64,8 +79,11 @@
           [columns]="previewResult?.columns ?? []"
           [rows]="previewResult?.rows ?? []"
           [loading]="previewLoading"
-          [errorMessage]="previewError"
+          [errorTitle]="previewErrorTitle"
+          [errorMessages]="previewErrors"
           [isTruncated]="previewResult?.isTruncated ?? false"
+          [appliedRowLimit]="previewResult?.appliedRowLimit ?? null"
+          [executionTimeMs]="previewResult?.executionTimeMs ?? null"
           [hasAttemptedPreview]="hasPreviewRun"
           [debugSql]="previewResult?.debugSql ?? null"
         ></app-preview-grid>

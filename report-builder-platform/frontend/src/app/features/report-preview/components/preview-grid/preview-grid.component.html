@@ -4,9 +4,14 @@
       <p-progressSpinner strokeWidth="4" [style]="{ width: '2rem', height: '2rem' }"></p-progressSpinner>
       <p>Running preview query...</p>
     </div>
-  } @else if (errorMessage) {
-    <div class="state-container">
-      <p-message severity="error" [text]="errorMessage"></p-message>
+  } @else if (hasErrors()) {
+    <div class="state-container error-state">
+      <p-message severity="error" [text]="errorTitle ?? 'Preview could not be run'"></p-message>
+      <ul class="error-list">
+        @for (message of errorMessages; track message) {
+          <li>{{ message }}</li>
+        }
+      </ul>
     </div>
   } @else if (!hasAttemptedPreview) {
     <div class="state-container">
@@ -18,7 +23,11 @@
     </div>
   } @else {
     @if (isTruncated) {
-      <p class="preview-warning">Preview limited to first 100 rows.</p>
+      <p class="preview-warning">Preview limited to first {{ appliedRowLimit ?? 100 }} rows.</p>
+    }
+
+    @if (executionTimeMs !== null && executionTimeMs !== undefined) {
+      <p class="preview-meta">Execution time: {{ executionTimeMs }} ms</p>
     }
 
     <p-table [value]="rows" [tableStyle]="{ 'min-width': '100%' }" size="small" [scrollable]="true" scrollHeight="flex">
