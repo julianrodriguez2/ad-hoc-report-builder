@@ -60,20 +60,29 @@ public class ReportQueryBuilderService(AppDbContext dbContext) : IReportQueryBui
 
         var requestedFields = definition.Fields ?? [];
         var requestedFilters = definition.Filters ?? [];
+        var requestedGrouping = definition.Grouping ?? [];
 
         var selectedFields = ValidateFieldSelection(requestedFields, datasetFieldMap);
         var validatedFilters = ValidateFilters(requestedFilters, datasetFieldMap);
+        var validatedGrouping = ValidateGrouping(requestedGrouping, datasetFieldMap);
+        ValidateGroupingSelectionCompatibility(selectedFields, validatedGrouping);
 
         var parameters = new Dictionary<string, object?>();
         var selectClause = BuildSelectClause(selectedFields);
         var fromClause = $"FROM {QuoteIdentifierIfNeeded(dataset.ViewName, allowPath: true)}";
         var whereClause = BuildWhereClause(validatedFilters, parameters);
-        var orderByClause = $"ORDER BY {QuoteIdentifierIfNeeded(selectedFields[0].FieldName)}";
+        var groupByClause = BuildGroupByClause(validatedGrouping);
+        var orderByClause = BuildOrderByClause(selectedFields, validatedGrouping);
 
         var sqlParts = new List<string> { selectClause, fromClause };
         if (!string.IsNullOrWhiteSpace(whereClause))
         {
             sqlParts.Add(whereClause);
+        }
+
+        if (!string.IsNullOrWhiteSpace(groupByClause))
+        {
+            sqlParts.Add(groupByClause);
         }
 
         sqlParts.Add(orderByClause);
@@ -211,6 +220,91 @@ public class ReportQueryBuilderService(AppDbContext dbContext) : IReportQueryBui
         return resolvedFields;
     }
 
+    private List<ValidatedGrouping> ValidateGrouping(
+        IReadOnlyList<GroupDefinitionDto> grouping,
+        IReadOnlyDictionary<string, DatasetField> datasetFieldMap)
+    {
+        if (grouping.Count == 0)
+        {
+            return [];
+        }
+
+        var normalizedGrouping = NormalizeGrouping(grouping);
+        var errors = new List<string>();
+        var validatedGrouping = new List<ValidatedGrouping>();
+        var seenFieldNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var index = 0; index < normalizedGrouping.Count; index++)
+        {
+            var group = normalizedGrouping[index];
+            var fieldName = group.FieldName?.Trim();
+            if (string.IsNullOrWhiteSpace(fieldName))
+            {
+                errors.Add($"Grouping item at index {index} is missing FieldName.");
+                continue;
+            }
+
+            if (!seenFieldNames.Add(fieldName))
+            {
+                errors.Add($"Grouping field '{fieldName}' is duplicated.");
+                continue;
+            }
+
+            if (!datasetFieldMap.TryGetValue(fieldName, out var metadataField))
+            {
+                errors.Add($"Grouping field '{fieldName}' does not belong to the selected dataset.");
+                continue;
+            }
+
+            if (!metadataField.IsGroupable)
+            {
+                errors.Add($"Field '{fieldName}' is not marked as groupable in metadata.");
+                continue;
+            }
+
+            var sortDirection = NormalizeSortDirection(group.SortDirection);
+            if (sortDirection is null)
+            {
+                errors.Add($"Grouping field '{fieldName}' has invalid sort direction '{group.SortDirection}'. Allowed values are 'asc' or 'desc'.");
+                continue;
+            }
+
+            validatedGrouping.Add(new ValidatedGrouping(metadataField, sortDirection, index + 1));
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new ReportValidationException(errors);
+        }
+
+        return validatedGrouping;
+    }
+
+    private static void ValidateGroupingSelectionCompatibility(
+        IReadOnlyList<DatasetField> selectedFields,
+        IReadOnlyList<ValidatedGrouping> grouping)
+    {
+        if (grouping.Count == 0)
+        {
+            return;
+        }
+
+        if (selectedFields.Count != grouping.Count)
+        {
+            throw new ReportValidationException(
+                "When grouping is used, selected fields must currently match grouped fields until summary fields are implemented.");
+        }
+
+        var selectedFieldSet = new HashSet<string>(selectedFields.Select(field => field.FieldName), StringComparer.OrdinalIgnoreCase);
+        var groupingFieldSet = new HashSet<string>(grouping.Select(group => group.Field.FieldName), StringComparer.OrdinalIgnoreCase);
+
+        if (!selectedFieldSet.SetEquals(groupingFieldSet))
+        {
+            throw new ReportValidationException(
+                "When grouping is used, selected fields must currently match grouped fields until summary fields are implemented.");
+        }
+    }
+
     private List<ValidatedFilter> ValidateFilters(IReadOnlyList<FilterDefinitionDto> filters, IReadOnlyDictionary<string, DatasetField> datasetFieldMap)
     {
         var errors = new List<string>();
@@ -279,6 +373,36 @@ public class ReportQueryBuilderService(AppDbContext dbContext) : IReportQueryBui
     {
         var selectColumns = selectedFields.Select(field => QuoteIdentifierIfNeeded(field.FieldName));
         return $"SELECT {string.Join(", ", selectColumns)}";
+    }
+
+    private static string BuildGroupByClause(IReadOnlyList<ValidatedGrouping> grouping)
+    {
+        if (grouping.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var groupByColumns = grouping
+            .OrderBy(group => group.GroupOrder)
+            .Select(group => QuoteIdentifierIfNeeded(group.Field.FieldName));
+
+        return $"GROUP BY {string.Join(", ", groupByColumns)}";
+    }
+
+    private static string BuildOrderByClause(
+        IReadOnlyList<DatasetField> selectedFields,
+        IReadOnlyList<ValidatedGrouping> grouping)
+    {
+        if (grouping.Count > 0)
+        {
+            var orderedGroups = grouping
+                .OrderBy(group => group.GroupOrder)
+                .Select(group => $"{QuoteIdentifierIfNeeded(group.Field.FieldName)} {group.SortDirection.ToUpperInvariant()}");
+
+            return $"ORDER BY {string.Join(", ", orderedGroups)}";
+        }
+
+        return $"ORDER BY {QuoteIdentifierIfNeeded(selectedFields[0].FieldName)}";
     }
 
     private string BuildWhereClause(IReadOnlyList<ValidatedFilter> filters, Dictionary<string, object?> parameters)
@@ -378,6 +502,36 @@ public class ReportQueryBuilderService(AppDbContext dbContext) : IReportQueryBui
     private static bool RequiresValue(string @operator)
     {
         return !OperatorsWithoutValues.Contains(@operator);
+    }
+
+    private static List<GroupDefinitionDto> NormalizeGrouping(IReadOnlyList<GroupDefinitionDto> grouping)
+    {
+        return grouping
+            .Select((group, index) => new
+            {
+                Group = group,
+                Index = index,
+                Order = group.GroupOrder <= 0 ? index + 1 : group.GroupOrder
+            })
+            .OrderBy(item => item.Order)
+            .ThenBy(item => item.Index)
+            .Select(item => item.Group)
+            .ToList();
+    }
+
+    private static string? NormalizeSortDirection(string? sortDirection)
+    {
+        if (string.IsNullOrWhiteSpace(sortDirection))
+        {
+            return null;
+        }
+
+        return sortDirection.Trim().ToLowerInvariant() switch
+        {
+            "asc" => "asc",
+            "desc" => "desc",
+            _ => null
+        };
     }
 
     private static string NormalizeDataType(string rawDataType)
@@ -848,4 +1002,9 @@ public class ReportQueryBuilderService(AppDbContext dbContext) : IReportQueryBui
         string Operator,
         object? PrimaryValue,
         object? SecondaryValue);
+
+    private sealed record ValidatedGrouping(
+        DatasetField Field,
+        string SortDirection,
+        int GroupOrder);
 }

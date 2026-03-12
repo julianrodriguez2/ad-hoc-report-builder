@@ -12,6 +12,7 @@ import { SplitterModule } from 'primeng/splitter';
 import { Dataset } from '../../../../core/models/dataset.model';
 import { Field } from '../../../../core/models/field.model';
 import { FilterDefinition } from '../../../../core/models/filter-definition.model';
+import { GroupDefinition } from '../../../../core/models/group-definition.model';
 import { PreviewResult } from '../../../../core/models/preview-result.model';
 import { ReportDefinition } from '../../../../core/models/report-definition.model';
 import { DatasetService } from '../../../../core/services/dataset.service';
@@ -89,7 +90,9 @@ export class ReportBuilderPageComponent implements OnInit {
       ...this.reportDefinition,
       datasetId,
       fields: [],
-      filters: []
+      filters: [],
+      grouping: [],
+      summaries: []
     };
     this.resetPreviewState();
 
@@ -116,6 +119,13 @@ export class ReportBuilderPageComponent implements OnInit {
     this.reportDefinition = {
       ...this.reportDefinition,
       filters
+    };
+  }
+
+  protected onGroupingChanged(grouping: GroupDefinition[]): void {
+    this.reportDefinition = {
+      ...this.reportDefinition,
+      grouping
     };
   }
 

@@ -37,7 +37,11 @@
           [filters]="reportDefinition.filters"
           (filtersChanged)="onFiltersChanged($event)"
         ></app-filter-builder>
-        <app-grouping-builder></app-grouping-builder>
+        <app-grouping-builder
+          [availableFields]="availableFields"
+          [grouping]="reportDefinition.grouping"
+          (groupingChanged)="onGroupingChanged($event)"
+        ></app-grouping-builder>
         <app-summary-builder></app-summary-builder>
       </div>
     </ng-template>

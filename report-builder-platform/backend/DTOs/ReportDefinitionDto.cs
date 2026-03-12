@@ -7,4 +7,6 @@ public class ReportDefinitionDto
     public List<SelectedFieldDto> Fields { get; set; } = new();
 
     public List<FilterDefinitionDto> Filters { get; set; } = new();
+
+    public List<GroupDefinitionDto> Grouping { get; set; } = new();
 }

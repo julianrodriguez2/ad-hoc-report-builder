@@ -1,4 +1,6 @@
 export interface GroupDefinition {
   fieldName: string;
-  direction: 'asc' | 'desc';
+  displayName: string;
+  sortDirection: 'asc' | 'desc';
+  groupOrder: number;
 }

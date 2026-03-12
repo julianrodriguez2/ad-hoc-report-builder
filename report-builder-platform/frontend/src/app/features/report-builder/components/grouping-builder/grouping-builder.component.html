@@ -1,10 +1,83 @@
-<p-panel header="Grouping Builder">
-  <ul class="group-list">
-    @for (group of groups; track group.fieldName) {
-      <li>
-        <span>{{ group.fieldName }}</span>
-        <small>{{ group.direction }}</small>
-      </li>
-    }
-  </ul>
+<p-panel>
+  <ng-template pTemplate="header">
+    <div class="panel-header">
+      <div class="panel-heading">
+        <h3>Grouping</h3>
+        <p>Group rows by one or more fields to organize report output.</p>
+      </div>
+    </div>
+  </ng-template>
+
+  @if (!hasGroupableFields()) {
+    <p class="placeholder-message">Select a dataset with groupable fields to configure grouping.</p>
+  } @else {
+    <div class="grouping-grid">
+      <section class="grouping-column">
+        <h4 class="column-title">Available Grouping Fields</h4>
+        @if (availableGroupingFields.length === 0) {
+          <p class="empty-state">All groupable fields are already selected.</p>
+        } @else {
+          <div class="available-list">
+            @for (field of availableGroupingFields; track trackByFieldName($index, field)) {
+              <div class="available-row">
+                <span class="field-name">{{ field.displayName }}</span>
+                <button
+                  pButton
+                  type="button"
+                  icon="pi pi-plus"
+                  text
+                  rounded
+                  severity="secondary"
+                  aria-label="Add grouping field"
+                  (click)="addGroupingField(field)"
+                ></button>
+              </div>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="grouping-column">
+        <h4 class="column-title">Selected Grouping</h4>
+        <div cdkDropList [cdkDropListData]="selectedGrouping" class="selected-list" (cdkDropListDropped)="onDrop($event)">
+          @if (selectedGrouping.length === 0) {
+            <p class="empty-state">No grouping applied yet.</p>
+          } @else {
+            @for (group of selectedGrouping; track trackByFieldName($index, group)) {
+              <div class="selected-row" cdkDrag>
+                <span class="drag-handle" cdkDragHandle>
+                  <i class="pi pi-bars"></i>
+                </span>
+                <span class="field-name">{{ group.displayName }}</span>
+                <p-dropdown
+                  [options]="sortDirectionOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  [ngModel]="group.sortDirection"
+                  styleClass="direction-dropdown"
+                  appendTo="body"
+                  (onChange)="onSortDirectionChanged(group.fieldName, $event.value)"
+                ></p-dropdown>
+                <button
+                  pButton
+                  type="button"
+                  icon="pi pi-times"
+                  text
+                  rounded
+                  severity="secondary"
+                  aria-label="Remove grouping field"
+                  (click)="removeGroupingField(group.fieldName)"
+                ></button>
+              </div>
+            }
+          }
+        </div>
+      </section>
+    </div>
+
+    <p class="temporary-note">
+      Grouped reports will support summaries in the next increment. For now, grouped preview works when selected fields
+      match grouping fields.
+    </p>
+  }
 </p-panel>
