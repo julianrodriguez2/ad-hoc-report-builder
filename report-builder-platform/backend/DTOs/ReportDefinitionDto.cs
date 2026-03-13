@@ -11,4 +11,6 @@ public class ReportDefinitionDto
     public List<GroupDefinitionDto> Grouping { get; set; } = new();
 
     public List<SummaryDefinitionDto> Summaries { get; set; } = new();
+
+    public LayoutSettingsDto LayoutSettings { get; set; } = new();
 }

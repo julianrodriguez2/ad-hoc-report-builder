@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, map } from 'rxjs';
 
+import { createDefaultLayoutSettings, normalizeLayoutSettings } from '../models/layout-settings.model';
 import { ReportDefinition } from '../models/report-definition.model';
 import {
   CreateSavedReportRequest,
@@ -67,7 +68,7 @@ export class SavedReportsService {
       filters: [],
       grouping: [],
       summaries: [],
-      layoutSettings: {}
+      layoutSettings: createDefaultLayoutSettings()
     };
 
     if (!definitionJson) {
@@ -86,8 +87,7 @@ export class SavedReportsService {
         filters: Array.isArray(parsed.filters) ? parsed.filters : [],
         grouping: Array.isArray(parsed.grouping) ? parsed.grouping : [],
         summaries: Array.isArray(parsed.summaries) ? parsed.summaries : [],
-        layoutSettings:
-          parsed.layoutSettings && typeof parsed.layoutSettings === 'object' ? parsed.layoutSettings : {}
+        layoutSettings: normalizeLayoutSettings(parsed.layoutSettings)
       };
     } catch {
       return fallback;

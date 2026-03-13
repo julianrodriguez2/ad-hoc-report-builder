@@ -18,13 +18,16 @@ import { Dataset } from '../../../../core/models/dataset.model';
 import { Field } from '../../../../core/models/field.model';
 import { FilterDefinition } from '../../../../core/models/filter-definition.model';
 import { GroupDefinition } from '../../../../core/models/group-definition.model';
+import { LayoutSettings, createDefaultLayoutSettings, normalizeLayoutSettings } from '../../../../core/models/layout-settings.model';
 import { PreviewResult } from '../../../../core/models/preview-result.model';
 import { ReportDefinition } from '../../../../core/models/report-definition.model';
+import { ReportTemplate } from '../../../../core/models/report-template.model';
 import { SavedReport } from '../../../../core/models/saved-report.model';
 import { SummaryDefinition } from '../../../../core/models/summary-definition.model';
 import { DatasetService } from '../../../../core/services/dataset.service';
 import { ReportService } from '../../../../core/services/report.service';
 import { SavedReportsService } from '../../../../core/services/saved-reports.service';
+import { REPORT_TEMPLATE_IDS, REPORT_TEMPLATES } from '../../../report-layout/data/report-templates';
 import { FieldSelectorComponent } from '../../components/field-selector/field-selector.component';
 import { FilterBuilderComponent } from '../../components/filter-builder/filter-builder.component';
 import { GroupingBuilderComponent } from '../../components/grouping-builder/grouping-builder.component';
@@ -93,6 +96,7 @@ export class ReportBuilderPageComponent implements OnInit {
   protected saveDialogErrors: string[] = [];
   protected saveSubmitting = false;
   protected saveSuccessMessage: string | null = null;
+  protected readonly reportTemplates: ReportTemplate[] = REPORT_TEMPLATES;
 
   protected reportDefinition: ReportDefinition = {
     datasetId: null,
@@ -100,7 +104,7 @@ export class ReportBuilderPageComponent implements OnInit {
     filters: [],
     grouping: [],
     summaries: [],
-    layoutSettings: {}
+    layoutSettings: createDefaultLayoutSettings()
   };
 
   private pendingSavedReportId: string | null = null;
@@ -195,6 +199,20 @@ export class ReportBuilderPageComponent implements OnInit {
     this.reportDefinition = {
       ...this.reportDefinition,
       summaries
+    };
+  }
+
+  protected onTemplateChanged(templateId: string): void {
+    this.onLayoutSettingsChanged({
+      ...this.reportDefinition.layoutSettings,
+      templateId
+    });
+  }
+
+  protected onLayoutSettingsChanged(layoutSettings: LayoutSettings): void {
+    this.reportDefinition = {
+      ...this.reportDefinition,
+      layoutSettings: this.normalizeDefinitionLayoutSettings(layoutSettings)
     };
   }
 
@@ -378,7 +396,7 @@ export class ReportBuilderPageComponent implements OnInit {
       filters: [],
       grouping: [],
       summaries: [],
-      layoutSettings: {}
+      layoutSettings: createDefaultLayoutSettings()
     };
     this.resetPreviewState();
 
@@ -396,8 +414,7 @@ export class ReportBuilderPageComponent implements OnInit {
           filters: Array.isArray(definition.filters) ? definition.filters : [],
           grouping: Array.isArray(definition.grouping) ? definition.grouping : [],
           summaries: Array.isArray(definition.summaries) ? definition.summaries : [],
-          layoutSettings:
-            definition.layoutSettings && typeof definition.layoutSettings === 'object' ? definition.layoutSettings : {}
+          layoutSettings: this.normalizeDefinitionLayoutSettings(definition.layoutSettings)
         };
         this.saveSuccessMessage = `Loaded saved report "${savedReport.name}".`;
       },
@@ -572,5 +589,17 @@ export class ReportBuilderPageComponent implements OnInit {
     }
 
     return hints;
+  }
+
+  private normalizeDefinitionLayoutSettings(value: unknown): LayoutSettings {
+    const normalized = normalizeLayoutSettings(value);
+    if (!REPORT_TEMPLATE_IDS.has(normalized.templateId)) {
+      return {
+        ...normalized,
+        templateId: createDefaultLayoutSettings().templateId
+      };
+    }
+
+    return normalized;
   }
 }

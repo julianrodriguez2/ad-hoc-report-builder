@@ -129,8 +129,15 @@
 
     <ng-template pTemplate>
       <div class="panel-stack right-panel">
-        <app-layout-editor></app-layout-editor>
-        <app-template-selector></app-template-selector>
+        <app-template-selector
+          [templates]="reportTemplates"
+          [selectedTemplateId]="reportDefinition.layoutSettings.templateId"
+          (templateChanged)="onTemplateChanged($event)"
+        ></app-template-selector>
+        <app-layout-editor
+          [layoutSettings]="reportDefinition.layoutSettings"
+          (layoutSettingsChanged)="onLayoutSettingsChanged($event)"
+        ></app-layout-editor>
       </div>
     </ng-template>
   </p-splitter>

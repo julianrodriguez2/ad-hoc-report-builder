@@ -17,6 +17,12 @@
   padding: 0.75rem;
 }
 
+.panel-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
 .center-panel {
   display: flex;
   flex-direction: column;

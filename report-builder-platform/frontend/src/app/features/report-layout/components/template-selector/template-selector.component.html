@@ -1,7 +1,36 @@
-<p-panel header="Template Selector">
-  <div class="template-grid">
-    @for (template of templates; track template) {
-      <button pButton type="button" [label]="template" size="small" class="template-button"></button>
-    }
-  </div>
+<p-panel>
+  <ng-template pTemplate="header">
+    <div class="panel-heading">
+      <h3>Template Selector</h3>
+      <p>Choose the export layout style for this report.</p>
+    </div>
+  </ng-template>
+
+  @if (templates.length === 0) {
+    <p class="empty-state">No templates are available.</p>
+  } @else {
+    <div class="template-grid">
+      @for (template of templates; track trackByTemplateId($index, template)) {
+        <button
+          type="button"
+          class="template-card"
+          [class.selected]="isSelected(template.id)"
+          (click)="selectTemplate(template.id)"
+        >
+          @if (template.previewImageUrl) {
+            <img class="template-preview-image" [src]="template.previewImageUrl" [alt]="template.name + ' preview'" />
+          } @else {
+            <div class="template-preview-placeholder">
+              <i class="pi pi-file"></i>
+            </div>
+          }
+
+          <div class="template-content">
+            <h4>{{ template.name }}</h4>
+            <p>{{ template.description }}</p>
+          </div>
+        </button>
+      }
+    </div>
+  }
 </p-panel>

@@ -1,5 +1,6 @@
 import { FilterDefinition } from './filter-definition.model';
 import { GroupDefinition } from './group-definition.model';
+import { LayoutSettings } from './layout-settings.model';
 import { SummaryDefinition } from './summary-definition.model';
 
 export interface ReportSelectedField {
@@ -13,5 +14,5 @@ export interface ReportDefinition {
   filters: FilterDefinition[];
   grouping: GroupDefinition[];
   summaries: SummaryDefinition[];
-  layoutSettings: Record<string, unknown>;
+  layoutSettings: LayoutSettings;
 }

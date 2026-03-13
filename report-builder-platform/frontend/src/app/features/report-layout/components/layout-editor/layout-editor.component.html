@@ -1,7 +1,116 @@
-<p-panel header="Layout Editor">
-  <ul class="layout-list">
-    @for (section of layoutSections; track section) {
-      <li>{{ section }}</li>
-    }
-  </ul>
+<p-panel>
+  <ng-template pTemplate="header">
+    <div class="panel-heading">
+      <h3>Report Layout</h3>
+      <p>Configure title, page setup, and export decorations.</p>
+    </div>
+  </ng-template>
+
+  <div class="layout-form">
+    <div class="form-field">
+      <label for="layoutReportTitle">Report Title</label>
+      <input
+        id="layoutReportTitle"
+        pInputText
+        type="text"
+        [ngModel]="draftLayoutSettings.reportTitle"
+        (ngModelChange)="onTemplateFieldChange('reportTitle', $event)"
+      />
+    </div>
+
+    <div class="form-field">
+      <label for="layoutSubtitle">Subtitle</label>
+      <input
+        id="layoutSubtitle"
+        pInputText
+        type="text"
+        [ngModel]="draftLayoutSettings.subtitle"
+        (ngModelChange)="onTemplateFieldChange('subtitle', $event)"
+      />
+    </div>
+
+    <div class="form-field">
+      <label for="layoutLogoUrl">Logo URL</label>
+      <input
+        id="layoutLogoUrl"
+        pInputText
+        type="text"
+        [ngModel]="draftLayoutSettings.logoUrl"
+        (ngModelChange)="onTemplateFieldChange('logoUrl', $event)"
+      />
+    </div>
+
+    <div class="form-field">
+      <label for="layoutHeaderText">Header Text</label>
+      <textarea
+        id="layoutHeaderText"
+        pInputTextarea
+        rows="2"
+        [ngModel]="draftLayoutSettings.headerText"
+        (ngModelChange)="onTemplateFieldChange('headerText', $event)"
+      ></textarea>
+    </div>
+
+    <div class="form-field">
+      <label for="layoutFooterText">Footer Text</label>
+      <textarea
+        id="layoutFooterText"
+        pInputTextarea
+        rows="2"
+        [ngModel]="draftLayoutSettings.footerText"
+        (ngModelChange)="onTemplateFieldChange('footerText', $event)"
+      ></textarea>
+    </div>
+
+    <div class="field-row">
+      <div class="form-field">
+        <label for="layoutOrientation">Page Orientation</label>
+        <p-dropdown
+          inputId="layoutOrientation"
+          [options]="orientationOptions"
+          optionLabel="label"
+          optionValue="value"
+          [ngModel]="draftLayoutSettings.pageOrientation"
+          appendTo="body"
+          (onChange)="onTemplateFieldChange('pageOrientation', $event.value)"
+        ></p-dropdown>
+      </div>
+
+      <div class="form-field">
+        <label for="layoutPageSize">Page Size</label>
+        <p-dropdown
+          inputId="layoutPageSize"
+          [options]="pageSizeOptions"
+          optionLabel="label"
+          optionValue="value"
+          [ngModel]="draftLayoutSettings.pageSize"
+          appendTo="body"
+          (onChange)="onTemplateFieldChange('pageSize', $event.value)"
+        ></p-dropdown>
+      </div>
+    </div>
+
+    <div class="checkbox-row">
+      <div class="checkbox-item">
+        <p-checkbox
+          inputId="showGeneratedDate"
+          [binary]="true"
+          [ngModel]="draftLayoutSettings.showGeneratedDate"
+          (ngModelChange)="onTemplateFieldChange('showGeneratedDate', $event)"
+        ></p-checkbox>
+        <label for="showGeneratedDate">Show Generated Date</label>
+      </div>
+      <div class="checkbox-item">
+        <p-checkbox
+          inputId="showPageNumbers"
+          [binary]="true"
+          [ngModel]="draftLayoutSettings.showPageNumbers"
+          (ngModelChange)="onTemplateFieldChange('showPageNumbers', $event)"
+        ></p-checkbox>
+        <label for="showPageNumbers">Show Page Numbers</label>
+      </div>
+    </div>
+  </div>
+
+  <p class="preview-note">Export preview will use this layout.</p>
 </p-panel>

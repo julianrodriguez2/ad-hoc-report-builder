@@ -1,8 +1,62 @@
-.layout-list {
+.panel-heading h3 {
   margin: 0;
-  padding-left: 1rem;
+  font-size: 1rem;
+  color: #0f172a;
 }
 
-.layout-list li {
-  margin-bottom: 0.35rem;
+.panel-heading p {
+  margin: 0.2rem 0 0;
+  font-size: 0.83rem;
+  color: #475569;
+}
+
+.layout-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.form-field label {
+  font-size: 0.81rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.2rem;
+}
+
+.checkbox-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: #334155;
+}
+
+.preview-note {
+  margin: 0.8rem 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+@media (max-width: 1200px) {
+  .field-row {
+    grid-template-columns: 1fr;
+  }
 }
