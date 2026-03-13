@@ -83,6 +83,10 @@ export class ReportBuilderPageComponent implements OnInit {
   protected previewErrors: string[] = [];
   protected previewResult: PreviewResult | null = null;
   protected hasPreviewRun = false;
+  protected exportLoading: 'pdf' | 'excel' | null = null;
+  protected exportErrorTitle: string | null = null;
+  protected exportErrors: string[] = [];
+  protected exportSuccessMessage: string | null = null;
 
   protected activeSavedReportId: string | null = null;
   protected activeSavedReportName: string | null = null;
@@ -143,6 +147,7 @@ export class ReportBuilderPageComponent implements OnInit {
   protected onDatasetChange(datasetId: string | null): void {
     this.clearSavedReportContext();
     this.saveSuccessMessage = null;
+    this.clearExportState();
     this.selectedDatasetId = datasetId;
     this.selectedDataset = this.datasets.find((dataset) => dataset.id === datasetId) ?? null;
     this.datasetRuleHints = this.buildDatasetRuleHints(this.selectedDataset);
@@ -218,6 +223,7 @@ export class ReportBuilderPageComponent implements OnInit {
 
   protected runPreview(): void {
     this.saveSuccessMessage = null;
+    this.clearExportState();
     this.hasPreviewRun = true;
     this.previewErrorTitle = null;
     this.previewErrors = [];
@@ -262,10 +268,19 @@ export class ReportBuilderPageComponent implements OnInit {
   }
 
   protected openSaveDialog(): void {
+    this.clearExportState();
     this.saveDialogErrors = [];
     this.saveDialogName = this.activeSavedReportName ?? '';
     this.saveDialogDescription = this.activeSavedReportDescription ?? '';
     this.isSaveDialogVisible = true;
+  }
+
+  protected exportPdf(): void {
+    this.runExport('pdf');
+  }
+
+  protected exportExcel(): void {
+    this.runExport('excel');
   }
 
   protected closeSaveDialog(): void {
@@ -352,6 +367,7 @@ export class ReportBuilderPageComponent implements OnInit {
     this.isSavedReportLoading = true;
     this.savedReportLoadError = null;
     this.saveSuccessMessage = null;
+    this.clearExportState();
 
     this.savedReportsService
       .getSavedReport(savedReportId)
@@ -443,6 +459,7 @@ export class ReportBuilderPageComponent implements OnInit {
   }
 
   private submitSave(mode: 'create' | 'update'): void {
+    this.clearExportState();
     this.saveDialogErrors = [];
 
     const reportName = this.saveDialogName.trim();
@@ -516,6 +533,140 @@ export class ReportBuilderPageComponent implements OnInit {
     this.previewErrors = [];
     this.previewResult = null;
     this.hasPreviewRun = false;
+  }
+
+  private runExport(format: 'pdf' | 'excel'): void {
+    this.saveSuccessMessage = null;
+    this.exportSuccessMessage = null;
+    this.exportErrorTitle = null;
+    this.exportErrors = [];
+
+    if (!this.reportDefinition.datasetId) {
+      this.exportErrorTitle = 'Export could not be run';
+      this.exportErrors = ['Select a dataset before exporting.'];
+      return;
+    }
+
+    if (this.reportDefinition.fields.length === 0) {
+      this.exportErrorTitle = 'Export could not be run';
+      this.exportErrors = ['Select at least one field before exporting.'];
+      return;
+    }
+
+    this.exportLoading = format;
+    const request$ = format === 'pdf'
+      ? this.reportService.exportPdf(this.reportDefinition)
+      : this.reportService.exportExcel(this.reportDefinition);
+
+    request$
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          this.exportLoading = null;
+        })
+      )
+      .subscribe({
+        next: (fileBlob) => {
+          const extension = format === 'pdf' ? 'pdf' : 'xlsx';
+          this.downloadFile(fileBlob, this.buildExportFileName(extension));
+          this.exportSuccessMessage = format === 'pdf'
+            ? 'PDF exported successfully.'
+            : 'Excel exported successfully.';
+        },
+        error: (error: unknown) => {
+          const fallbackTitle = format === 'pdf'
+            ? 'PDF export could not be run'
+            : 'Excel export could not be run';
+          void this.applyExportErrorState(error, fallbackTitle);
+        }
+      });
+  }
+
+  private downloadFile(fileBlob: Blob, filename: string): void {
+    const objectUrl = URL.createObjectURL(fileBlob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  private buildExportFileName(extension: 'pdf' | 'xlsx'): string {
+    const reportTitle = this.reportDefinition.layoutSettings.reportTitle || 'report';
+    const normalizedTitle = reportTitle
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    const baseName = normalizedTitle || 'report';
+    const currentDate = new Date().toISOString().slice(0, 10);
+    return `${baseName}-${currentDate}.${extension}`;
+  }
+
+  private async applyExportErrorState(error: unknown, fallbackTitle: string): Promise<void> {
+    const fallback = {
+      title: fallbackTitle,
+      errors: ['Unable to export report due to an unexpected error.']
+    };
+
+    if (!(error instanceof HttpErrorResponse)) {
+      this.exportErrorTitle = fallback.title;
+      this.exportErrors = fallback.errors;
+      return;
+    }
+
+    const payload = await this.readErrorPayload(error);
+    if (payload?.errors && payload.errors.length > 0) {
+      this.exportErrorTitle = payload.message ?? fallbackTitle;
+      this.exportErrors = payload.errors;
+      return;
+    }
+
+    if (payload?.message) {
+      this.exportErrorTitle = fallbackTitle;
+      this.exportErrors = [payload.message];
+      return;
+    }
+
+    this.exportErrorTitle = fallback.title;
+    this.exportErrors = fallback.errors;
+  }
+
+  private async readErrorPayload(
+    error: HttpErrorResponse
+  ): Promise<{ message?: string; errors?: string[] } | null> {
+    const responsePayload = error.error;
+
+    if (responsePayload instanceof Blob) {
+      try {
+        const textPayload = await responsePayload.text();
+        if (!textPayload) {
+          return null;
+        }
+
+        try {
+          const parsedPayload = JSON.parse(textPayload) as { message?: string; errors?: string[] };
+          return parsedPayload;
+        } catch {
+          return { message: textPayload };
+        }
+      } catch {
+        return null;
+      }
+    }
+
+    if (responsePayload && typeof responsePayload === 'object') {
+      return responsePayload as { message?: string; errors?: string[] };
+    }
+
+    return null;
+  }
+
+  private clearExportState(): void {
+    this.exportLoading = null;
+    this.exportErrorTitle = null;
+    this.exportErrors = [];
+    this.exportSuccessMessage = null;
   }
 
   private clearSavedReportContext(): void {

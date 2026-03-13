@@ -6,9 +6,12 @@ namespace backend.Controllers;
 
 [ApiController]
 [Route("api/reports")]
-public class ReportController(IReportPreviewService reportPreviewService) : ControllerBase
+public class ReportController(
+    IReportPreviewService reportPreviewService,
+    IReportExportService reportExportService) : ControllerBase
 {
     private readonly IReportPreviewService _reportPreviewService = reportPreviewService;
+    private readonly IReportExportService _reportExportService = reportExportService;
 
     [HttpPost("preview")]
     public async Task<ActionResult<PreviewResultDto>> Preview([FromBody] ReportDefinitionDto definition, CancellationToken cancellationToken)
@@ -61,20 +64,86 @@ public class ReportController(IReportPreviewService reportPreviewService) : Cont
     }
 
     [HttpPost("export/pdf")]
-    public ActionResult<object> ExportPdf()
+    public async Task<IActionResult> ExportPdf([FromBody] ReportDefinitionDto definition, CancellationToken cancellationToken)
     {
-        return StatusCode(StatusCodes.Status501NotImplemented, new
+        try
         {
-            message = "PDF export is not implemented yet."
-        });
+            var bytes = await _reportExportService.ExportPdfAsync(definition, cancellationToken);
+            var fileName = $"report-{DateTime.UtcNow:yyyy-MM-dd}.pdf";
+            return File(bytes, "application/pdf", fileName);
+        }
+        catch (ReportValidationException exception)
+        {
+            return BadRequest(new
+            {
+                message = "Report validation failed.",
+                errors = exception.Errors
+            });
+        }
+        catch (ReportExportException exception) when (exception.IsTimeout)
+        {
+            return BadRequest(new
+            {
+                message = "Export query exceeded the allowed execution time.",
+                errors = new[] { "Export query exceeded the allowed execution time." }
+            });
+        }
+        catch (ReportExportException exception)
+        {
+            return BadRequest(new
+            {
+                message = exception.Message,
+                errors = new[] { exception.Message }
+            });
+        }
+        catch (Exception)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new
+            {
+                message = "An unexpected error occurred while exporting PDF."
+            });
+        }
     }
 
     [HttpPost("export/excel")]
-    public ActionResult<object> ExportExcel()
+    public async Task<IActionResult> ExportExcel([FromBody] ReportDefinitionDto definition, CancellationToken cancellationToken)
     {
-        return StatusCode(StatusCodes.Status501NotImplemented, new
+        try
         {
-            message = "Excel export is not implemented yet."
-        });
+            var bytes = await _reportExportService.ExportExcelAsync(definition, cancellationToken);
+            var fileName = $"report-{DateTime.UtcNow:yyyy-MM-dd}.xlsx";
+            return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        }
+        catch (ReportValidationException exception)
+        {
+            return BadRequest(new
+            {
+                message = "Report validation failed.",
+                errors = exception.Errors
+            });
+        }
+        catch (ReportExportException exception) when (exception.IsTimeout)
+        {
+            return BadRequest(new
+            {
+                message = "Export query exceeded the allowed execution time.",
+                errors = new[] { "Export query exceeded the allowed execution time." }
+            });
+        }
+        catch (ReportExportException exception)
+        {
+            return BadRequest(new
+            {
+                message = exception.Message,
+                errors = new[] { exception.Message }
+            });
+        }
+        catch (Exception)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new
+            {
+                message = "An unexpected error occurred while exporting Excel."
+            });
+        }
     }
 }

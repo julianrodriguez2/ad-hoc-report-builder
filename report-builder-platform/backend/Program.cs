@@ -12,8 +12,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IReportQueryBuilderService, ReportQueryBuilderService>();
 builder.Services.AddScoped<IReportGuardrailService, ReportGuardrailService>();
 builder.Services.AddScoped<IReportPreviewService, ReportPreviewService>();
+builder.Services.AddScoped<IReportExportService, ReportExportService>();
 builder.Services.AddScoped<IDatasetRepository, DatasetRepository>();
 builder.Services.AddScoped<ISavedReportRepository, SavedReportRepository>();
+builder.Services.AddHttpClient();
 
 var app = builder.Build();
 

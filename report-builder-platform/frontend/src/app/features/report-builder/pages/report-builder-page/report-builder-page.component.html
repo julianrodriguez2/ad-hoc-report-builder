@@ -77,6 +77,9 @@
             @if (saveSuccessMessage) {
               <p-message severity="success" [text]="saveSuccessMessage"></p-message>
             }
+            @if (exportSuccessMessage) {
+              <p-message severity="success" [text]="exportSuccessMessage"></p-message>
+            }
           </div>
 
           <div class="toolbar-actions">
@@ -103,14 +106,49 @@
             <button
               pButton
               type="button"
+              label="Export PDF"
+              icon="pi pi-file-pdf"
+              severity="secondary"
+              [loading]="exportLoading === 'pdf'"
+              [disabled]="previewLoading || !!exportLoading"
+              (click)="exportPdf()"
+            ></button>
+
+            <button
+              pButton
+              type="button"
+              label="Export Excel"
+              icon="pi pi-file-excel"
+              severity="secondary"
+              [loading]="exportLoading === 'excel'"
+              [disabled]="previewLoading || !!exportLoading"
+              (click)="exportExcel()"
+            ></button>
+
+            <button
+              pButton
+              type="button"
               label="Run Preview"
               icon="pi pi-play"
               [loading]="previewLoading"
-              [disabled]="previewLoading"
+              [disabled]="previewLoading || !!exportLoading"
               (click)="runPreview()"
             ></button>
           </div>
         </div>
+
+        @if (exportErrorTitle) {
+          <div class="export-error-container">
+            <p-message severity="error" [text]="exportErrorTitle"></p-message>
+            @if (exportErrors.length > 0) {
+              <ul class="export-error-list">
+                @for (error of exportErrors; track error) {
+                  <li>{{ error }}</li>
+                }
+              </ul>
+            }
+          </div>
+        }
 
         <app-preview-grid
           [columns]="previewResult?.columns ?? []"

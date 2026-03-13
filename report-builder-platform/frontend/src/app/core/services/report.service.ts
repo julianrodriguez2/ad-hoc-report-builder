@@ -16,4 +16,16 @@ export class ReportService {
   previewReport(definition: ReportDefinition): Observable<PreviewResult> {
     return this.http.post<PreviewResult>(`${this.apiBaseUrl}/reports/preview`, definition);
   }
+
+  exportPdf(definition: ReportDefinition): Observable<Blob> {
+    return this.http.post(`${this.apiBaseUrl}/reports/export/pdf`, definition, {
+      responseType: 'blob'
+    });
+  }
+
+  exportExcel(definition: ReportDefinition): Observable<Blob> {
+    return this.http.post(`${this.apiBaseUrl}/reports/export/excel`, definition, {
+      responseType: 'blob'
+    });
+  }
 }
