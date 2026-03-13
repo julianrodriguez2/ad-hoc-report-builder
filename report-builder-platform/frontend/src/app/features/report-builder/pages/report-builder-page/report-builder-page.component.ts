@@ -3,9 +3,14 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { ButtonModule } from 'primeng/button';
+import { DialogModule } from 'primeng/dialog';
 import { DropdownModule } from 'primeng/dropdown';
+import { InputTextareaModule } from 'primeng/inputtextarea';
+import { InputTextModule } from 'primeng/inputtext';
+import { MessageModule } from 'primeng/message';
 import { PanelModule } from 'primeng/panel';
 import { SplitterModule } from 'primeng/splitter';
 
@@ -15,9 +20,11 @@ import { FilterDefinition } from '../../../../core/models/filter-definition.mode
 import { GroupDefinition } from '../../../../core/models/group-definition.model';
 import { PreviewResult } from '../../../../core/models/preview-result.model';
 import { ReportDefinition } from '../../../../core/models/report-definition.model';
+import { SavedReport } from '../../../../core/models/saved-report.model';
 import { SummaryDefinition } from '../../../../core/models/summary-definition.model';
 import { DatasetService } from '../../../../core/services/dataset.service';
 import { ReportService } from '../../../../core/services/report.service';
+import { SavedReportsService } from '../../../../core/services/saved-reports.service';
 import { FieldSelectorComponent } from '../../components/field-selector/field-selector.component';
 import { FilterBuilderComponent } from '../../components/filter-builder/filter-builder.component';
 import { GroupingBuilderComponent } from '../../components/grouping-builder/grouping-builder.component';
@@ -32,8 +39,13 @@ import { PreviewGridComponent } from '../../../report-preview/components/preview
   imports: [
     CommonModule,
     FormsModule,
+    RouterLink,
     ButtonModule,
     DropdownModule,
+    DialogModule,
+    InputTextModule,
+    InputTextareaModule,
+    MessageModule,
     PanelModule,
     SplitterModule,
     FieldSelectorComponent,
@@ -49,6 +61,8 @@ import { PreviewGridComponent } from '../../../report-preview/components/preview
 })
 export class ReportBuilderPageComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   protected datasets: Dataset[] = [];
   protected selectedDataset: Dataset | null = null;
@@ -67,6 +81,19 @@ export class ReportBuilderPageComponent implements OnInit {
   protected previewResult: PreviewResult | null = null;
   protected hasPreviewRun = false;
 
+  protected activeSavedReportId: string | null = null;
+  protected activeSavedReportName: string | null = null;
+  protected activeSavedReportDescription: string | null = null;
+  protected isSavedReportLoading = false;
+  protected savedReportLoadError: string | null = null;
+
+  protected isSaveDialogVisible = false;
+  protected saveDialogName = '';
+  protected saveDialogDescription = '';
+  protected saveDialogErrors: string[] = [];
+  protected saveSubmitting = false;
+  protected saveSuccessMessage: string | null = null;
+
   protected reportDefinition: ReportDefinition = {
     datasetId: null,
     fields: [],
@@ -76,16 +103,42 @@ export class ReportBuilderPageComponent implements OnInit {
     layoutSettings: {}
   };
 
+  private pendingSavedReportId: string | null = null;
+
   constructor(
     private readonly datasetService: DatasetService,
-    private readonly reportService: ReportService
+    private readonly reportService: ReportService,
+    private readonly savedReportsService: SavedReportsService
   ) {}
 
   ngOnInit(): void {
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        const savedReportId = params.get('savedReportId');
+        if (!savedReportId) {
+          this.pendingSavedReportId = null;
+          return;
+        }
+
+        if (savedReportId === this.activeSavedReportId) {
+          return;
+        }
+
+        if (this.datasets.length === 0) {
+          this.pendingSavedReportId = savedReportId;
+          return;
+        }
+
+        this.loadSavedReport(savedReportId);
+      });
+
     this.loadDatasets();
   }
 
   protected onDatasetChange(datasetId: string | null): void {
+    this.clearSavedReportContext();
+    this.saveSuccessMessage = null;
     this.selectedDatasetId = datasetId;
     this.selectedDataset = this.datasets.find((dataset) => dataset.id === datasetId) ?? null;
     this.datasetRuleHints = this.buildDatasetRuleHints(this.selectedDataset);
@@ -146,6 +199,7 @@ export class ReportBuilderPageComponent implements OnInit {
   }
 
   protected runPreview(): void {
+    this.saveSuccessMessage = null;
     this.hasPreviewRun = true;
     this.previewErrorTitle = null;
     this.previewErrors = [];
@@ -189,6 +243,35 @@ export class ReportBuilderPageComponent implements OnInit {
       });
   }
 
+  protected openSaveDialog(): void {
+    this.saveDialogErrors = [];
+    this.saveDialogName = this.activeSavedReportName ?? '';
+    this.saveDialogDescription = this.activeSavedReportDescription ?? '';
+    this.isSaveDialogVisible = true;
+  }
+
+  protected closeSaveDialog(): void {
+    if (this.saveSubmitting) {
+      return;
+    }
+
+    this.isSaveDialogVisible = false;
+    this.saveDialogErrors = [];
+  }
+
+  protected saveAsNew(): void {
+    this.submitSave('create');
+  }
+
+  protected updateSavedReport(): void {
+    if (!this.activeSavedReportId) {
+      this.submitSave('create');
+      return;
+    }
+
+    this.submitSave('update');
+  }
+
   private loadDatasets(): void {
     this.isDatasetsLoading = true;
     this.datasetsLoadError = null;
@@ -205,7 +288,11 @@ export class ReportBuilderPageComponent implements OnInit {
         next: (datasets) => {
           this.datasets = datasets;
 
-          if (datasets.length > 0) {
+          if (this.pendingSavedReportId) {
+            const pendingId = this.pendingSavedReportId;
+            this.pendingSavedReportId = null;
+            this.loadSavedReport(pendingId);
+          } else if (datasets.length > 0) {
             const defaultDatasetId = datasets[0].id;
             this.onDatasetChange(defaultDatasetId);
           }
@@ -216,7 +303,11 @@ export class ReportBuilderPageComponent implements OnInit {
       });
   }
 
-  private loadDatasetFields(datasetId: string): void {
+  private loadDatasetFields(
+    datasetId: string,
+    onLoaded?: (fields: Field[]) => void,
+    onError?: () => void
+  ): void {
     this.isFieldsLoading = true;
 
     this.datasetService
@@ -230,9 +321,174 @@ export class ReportBuilderPageComponent implements OnInit {
       .subscribe({
         next: (fields) => {
           this.availableFields = fields;
+          onLoaded?.(fields);
         },
         error: () => {
           this.fieldsLoadError = 'Unable to load fields for the selected dataset.';
+          onError?.();
+        }
+      });
+  }
+
+  private loadSavedReport(savedReportId: string): void {
+    this.isSavedReportLoading = true;
+    this.savedReportLoadError = null;
+    this.saveSuccessMessage = null;
+
+    this.savedReportsService
+      .getSavedReport(savedReportId)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          this.isSavedReportLoading = false;
+        })
+      )
+      .subscribe({
+        next: (savedReport) => {
+          this.applySavedReport(savedReport);
+        },
+        error: (error: unknown) => {
+          const errorState = this.toPreviewErrorState(error);
+          this.savedReportLoadError = errorState.errors.join(' ');
+        }
+      });
+  }
+
+  private applySavedReport(savedReport: SavedReport): void {
+    const definition = savedReport.definition;
+    if (!definition.datasetId) {
+      this.savedReportLoadError = 'Saved report definition is invalid or missing a dataset.';
+      return;
+    }
+
+    const datasetId = definition.datasetId;
+    this.activeSavedReportId = savedReport.id;
+    this.activeSavedReportName = savedReport.name;
+    this.activeSavedReportDescription = savedReport.description ?? null;
+
+    this.selectedDatasetId = datasetId;
+    this.selectedDataset = this.datasets.find((dataset) => dataset.id === datasetId) ?? null;
+    this.datasetRuleHints = this.buildDatasetRuleHints(this.selectedDataset);
+    this.fieldsLoadError = null;
+    this.availableFields = [];
+    this.selectedFields = [];
+    this.reportDefinition = {
+      datasetId,
+      fields: [],
+      filters: [],
+      grouping: [],
+      summaries: [],
+      layoutSettings: {}
+    };
+    this.resetPreviewState();
+
+    this.loadDatasetFields(
+      datasetId,
+      (datasetFields) => {
+        const mappedSelectedFields = this.mapSelectedFieldsFromDefinition(definition, datasetFields);
+        this.selectedFields = mappedSelectedFields;
+        this.reportDefinition = {
+          datasetId,
+          fields: mappedSelectedFields.map((field) => ({
+            fieldName: field.fieldName,
+            displayName: field.displayName
+          })),
+          filters: Array.isArray(definition.filters) ? definition.filters : [],
+          grouping: Array.isArray(definition.grouping) ? definition.grouping : [],
+          summaries: Array.isArray(definition.summaries) ? definition.summaries : [],
+          layoutSettings:
+            definition.layoutSettings && typeof definition.layoutSettings === 'object' ? definition.layoutSettings : {}
+        };
+        this.saveSuccessMessage = `Loaded saved report "${savedReport.name}".`;
+      },
+      () => {
+        this.savedReportLoadError = 'The saved report dataset could not be loaded. It may have been removed.';
+      }
+    );
+  }
+
+  private mapSelectedFieldsFromDefinition(definition: ReportDefinition, datasetFields: Field[]): Field[] {
+    const selectedFieldsFromDefinition = Array.isArray(definition.fields) ? definition.fields : [];
+    return selectedFieldsFromDefinition
+      .map((selectedField) => {
+        const metadataField = datasetFields.find((field) => field.fieldName === selectedField.fieldName);
+        if (metadataField) {
+          return metadataField;
+        }
+
+        return {
+          id: selectedField.fieldName,
+          fieldName: selectedField.fieldName,
+          displayName: selectedField.displayName || selectedField.fieldName
+        } as Field;
+      })
+      .filter((field) => !!field.fieldName);
+  }
+
+  private submitSave(mode: 'create' | 'update'): void {
+    this.saveDialogErrors = [];
+
+    const reportName = this.saveDialogName.trim();
+    const reportDescription = this.saveDialogDescription.trim();
+    const datasetId = this.reportDefinition.datasetId;
+
+    if (!datasetId) {
+      this.saveDialogErrors = ['Select a dataset before saving the report.'];
+      return;
+    }
+
+    if (!reportName) {
+      this.saveDialogErrors = ['Report name is required.'];
+      return;
+    }
+
+    this.saveSubmitting = true;
+
+    const createOrUpdate$ =
+      mode === 'update' && this.activeSavedReportId
+        ? this.savedReportsService.updateSavedReport(this.activeSavedReportId, {
+            name: reportName,
+            description: reportDescription || null,
+            definition: this.reportDefinition
+          })
+        : this.savedReportsService.createSavedReport({
+            name: reportName,
+            description: reportDescription || null,
+            datasetId,
+            definition: this.reportDefinition
+          });
+
+    createOrUpdate$
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          this.saveSubmitting = false;
+        })
+      )
+      .subscribe({
+        next: (savedReport) => {
+          this.activeSavedReportId = savedReport.id;
+          this.activeSavedReportName = savedReport.name;
+          this.activeSavedReportDescription = savedReport.description ?? null;
+          this.saveDialogName = savedReport.name;
+          this.saveDialogDescription = savedReport.description ?? '';
+          this.isSaveDialogVisible = false;
+          this.saveDialogErrors = [];
+          this.saveSuccessMessage =
+            mode === 'update'
+              ? 'Report updated successfully.'
+              : 'Report saved successfully.';
+
+          this.pendingSavedReportId = null;
+          this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: { savedReportId: savedReport.id },
+            queryParamsHandling: 'merge'
+          });
+        },
+        error: (error: unknown) => {
+          const errorState = this.toPreviewErrorState(error);
+          this.saveDialogErrors = errorState.errors;
         }
       });
   }
@@ -243,6 +499,21 @@ export class ReportBuilderPageComponent implements OnInit {
     this.previewErrors = [];
     this.previewResult = null;
     this.hasPreviewRun = false;
+  }
+
+  private clearSavedReportContext(): void {
+    if (this.activeSavedReportId) {
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { savedReportId: null },
+        queryParamsHandling: 'merge'
+      });
+    }
+
+    this.activeSavedReportId = null;
+    this.activeSavedReportName = null;
+    this.activeSavedReportDescription = null;
+    this.savedReportLoadError = null;
   }
 
   private toPreviewErrorState(error: unknown): { title: string; errors: string[] } {

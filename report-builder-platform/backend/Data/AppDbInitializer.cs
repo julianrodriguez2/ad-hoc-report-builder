@@ -12,6 +12,7 @@ public static class AppDbInitializer
     {
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
         await EnsureDatasetGuardrailColumnsAsync(dbContext, cancellationToken);
+        await EnsureSavedReportsTableSchemaAsync(dbContext, cancellationToken);
 
         var createdAt = DateTime.UtcNow;
         var hasDatasetUpdates = false;
@@ -216,6 +217,121 @@ public static class AppDbInitializer
             cancellationToken);
 
         await SeedPreviewViewsAndSampleRowsAsync(dbContext, cancellationToken);
+    }
+
+    private static async Task EnsureSavedReportsTableSchemaAsync(AppDbContext dbContext, CancellationToken cancellationToken)
+    {
+        const string ensureSavedReportsTableSql = """
+            IF OBJECT_ID('dbo.SavedReports', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.SavedReports
+                (
+                    Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_SavedReports PRIMARY KEY,
+                    Name NVARCHAR(200) NOT NULL,
+                    Description NVARCHAR(1000) NULL,
+                    DatasetId UNIQUEIDENTIFIER NOT NULL,
+                    DefinitionJson NVARCHAR(MAX) NOT NULL,
+                    CreatedAt DATETIME2 NOT NULL,
+                    UpdatedAt DATETIME2 NULL,
+                    CreatedBy NVARCHAR(256) NULL
+                );
+
+                CREATE INDEX IX_SavedReports_DatasetId ON dbo.SavedReports (DatasetId);
+            END
+            """;
+
+        const string rebuildLegacySavedReportsTableSql = """
+            IF OBJECT_ID('dbo.SavedReports', 'U') IS NOT NULL
+               AND EXISTS
+               (
+                   SELECT 1
+                   FROM sys.columns
+                   WHERE object_id = OBJECT_ID('dbo.SavedReports')
+                     AND name = 'Id'
+                     AND system_type_id <> TYPE_ID('uniqueidentifier')
+               )
+            BEGIN
+                CREATE TABLE dbo.SavedReports_New
+                (
+                    Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_SavedReports_New PRIMARY KEY,
+                    Name NVARCHAR(200) NOT NULL,
+                    Description NVARCHAR(1000) NULL,
+                    DatasetId UNIQUEIDENTIFIER NOT NULL,
+                    DefinitionJson NVARCHAR(MAX) NOT NULL,
+                    CreatedAt DATETIME2 NOT NULL,
+                    UpdatedAt DATETIME2 NULL,
+                    CreatedBy NVARCHAR(256) NULL
+                );
+
+                INSERT INTO dbo.SavedReports_New (Id, Name, Description, DatasetId, DefinitionJson, CreatedAt, UpdatedAt, CreatedBy)
+                SELECT
+                    NEWID(),
+                    ISNULL(NULLIF(Name, ''), 'Untitled Report'),
+                    NULL,
+                    ISNULL(
+                        TRY_CONVERT(
+                            uniqueidentifier,
+                            CASE WHEN ISJSON(DefinitionJson) = 1 THEN JSON_VALUE(DefinitionJson, '$.datasetId') END),
+                        '00000000-0000-0000-0000-000000000000'),
+                    ISNULL(NULLIF(DefinitionJson, ''), '{}'),
+                    ISNULL(CreatedAt, SYSUTCDATETIME()),
+                    NULL,
+                    NULLIF(CreatedBy, '')
+                FROM dbo.SavedReports;
+
+                DROP TABLE dbo.SavedReports;
+                EXEC sp_rename 'dbo.SavedReports_New', 'SavedReports';
+                EXEC sp_rename 'PK_SavedReports_New', 'PK_SavedReports';
+
+                CREATE INDEX IX_SavedReports_DatasetId ON dbo.SavedReports (DatasetId);
+            END
+            """;
+
+        const string ensureSavedReportsColumnsSql = """
+            IF COL_LENGTH('dbo.SavedReports', 'Description') IS NULL
+            BEGIN
+                ALTER TABLE dbo.SavedReports ADD Description NVARCHAR(1000) NULL;
+            END
+
+            IF COL_LENGTH('dbo.SavedReports', 'DatasetId') IS NULL
+            BEGIN
+                ALTER TABLE dbo.SavedReports ADD DatasetId UNIQUEIDENTIFIER NULL;
+                UPDATE dbo.SavedReports
+                SET DatasetId = ISNULL(
+                    TRY_CONVERT(
+                        uniqueidentifier,
+                        CASE WHEN ISJSON(DefinitionJson) = 1 THEN JSON_VALUE(DefinitionJson, '$.datasetId') END),
+                    '00000000-0000-0000-0000-000000000000');
+                ALTER TABLE dbo.SavedReports ALTER COLUMN DatasetId UNIQUEIDENTIFIER NOT NULL;
+            END
+
+            IF COL_LENGTH('dbo.SavedReports', 'UpdatedAt') IS NULL
+            BEGIN
+                ALTER TABLE dbo.SavedReports ADD UpdatedAt DATETIME2 NULL;
+            END
+
+            IF COL_LENGTH('dbo.SavedReports', 'CreatedBy') IS NULL
+            BEGIN
+                ALTER TABLE dbo.SavedReports ADD CreatedBy NVARCHAR(256) NULL;
+            END
+            """;
+
+        const string ensureSavedReportsIndexSql = """
+            IF NOT EXISTS (
+                SELECT 1
+                FROM sys.indexes
+                WHERE object_id = OBJECT_ID('dbo.SavedReports')
+                  AND name = 'IX_SavedReports_DatasetId'
+            )
+            BEGIN
+                CREATE INDEX IX_SavedReports_DatasetId ON dbo.SavedReports (DatasetId);
+            END
+            """;
+
+        await dbContext.Database.ExecuteSqlRawAsync(ensureSavedReportsTableSql, cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(rebuildLegacySavedReportsTableSql, cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(ensureSavedReportsColumnsSql, cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(ensureSavedReportsIndexSql, cancellationToken);
     }
 
     private static bool ApplyDatasetGuardrails(

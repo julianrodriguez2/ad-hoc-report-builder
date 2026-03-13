@@ -59,12 +59,57 @@
 
 .preview-toolbar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.toolbar-left {
+  min-height: 2rem;
+  display: flex;
+  align-items: center;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 app-preview-grid {
   flex: 1;
   min-height: 0;
+}
+
+.save-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.dialog-field label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.dialog-errors {
+  margin: 0;
+  padding-left: 1rem;
+  color: #b91c1c;
+  font-size: 0.84rem;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
 }
 
 @media (max-width: 1024px) {
@@ -74,5 +119,15 @@ app-preview-grid {
 
   :host ::ng-deep .full-height-splitter {
     height: auto;
+  }
+
+  .preview-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
   }
 }

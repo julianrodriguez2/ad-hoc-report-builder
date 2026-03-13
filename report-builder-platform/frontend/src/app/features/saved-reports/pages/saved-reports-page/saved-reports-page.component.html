@@ -1,22 +1,72 @@
 <section class="saved-reports-page">
   <p-card header="Saved Reports">
-    <p-table [value]="reports" [tableStyle]="{ 'min-width': '36rem' }" size="small">
-      <ng-template pTemplate="header">
-        <tr>
-          <th>ID</th>
-          <th>Name</th>
-          <th>Created By</th>
-          <th>Created At</th>
-        </tr>
-      </ng-template>
-      <ng-template pTemplate="body" let-report>
-        <tr>
-          <td>{{ report.id }}</td>
-          <td>{{ report.name }}</td>
-          <td>{{ report.createdBy }}</td>
-          <td>{{ report.createdAt }}</td>
-        </tr>
-      </ng-template>
-    </p-table>
+    @if (errorMessage) {
+      <p-message severity="error" [text]="errorMessage"></p-message>
+    }
+
+    @if (successMessage) {
+      <p-message severity="success" [text]="successMessage"></p-message>
+    }
+
+    @if (loading) {
+      <p class="status-text">Loading saved reports...</p>
+    } @else if (reports.length === 0) {
+      <p class="status-text">No saved reports yet.</p>
+    } @else {
+      <p-table [value]="reports" [tableStyle]="{ 'min-width': '40rem' }" size="small">
+        <ng-template pTemplate="header">
+          <tr>
+            <th>Name</th>
+            <th>Dataset</th>
+            <th>Created At</th>
+            <th>Actions</th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-report>
+          <tr>
+            <td>
+              <div class="report-name">{{ report.name }}</div>
+              @if (report.description) {
+                <small class="report-description">{{ report.description }}</small>
+              }
+            </td>
+            <td>{{ getDatasetName(report.datasetId) }}</td>
+            <td>{{ report.createdAt | date: 'yyyy-MM-dd HH:mm' }}</td>
+            <td>
+              <div class="action-buttons">
+                <button
+                  pButton
+                  type="button"
+                  size="small"
+                  label="Load"
+                  icon="pi pi-upload"
+                  text
+                  (click)="loadReport(report.id)"
+                ></button>
+                <button
+                  pButton
+                  type="button"
+                  size="small"
+                  label="Edit"
+                  icon="pi pi-pencil"
+                  text
+                  (click)="editReport(report.id)"
+                ></button>
+                <button
+                  pButton
+                  type="button"
+                  size="small"
+                  label="Delete"
+                  icon="pi pi-trash"
+                  text
+                  severity="danger"
+                  (click)="deleteReport(report)"
+                ></button>
+              </div>
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    }
   </p-card>
 </section>

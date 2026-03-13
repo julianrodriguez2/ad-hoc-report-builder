@@ -1,6 +1,6 @@
-namespace backend.Models;
+namespace backend.DTOs;
 
-public class SavedReport
+public class SavedReportDto
 {
     public Guid Id { get; set; }
 
@@ -15,6 +15,4 @@ public class SavedReport
     public DateTime CreatedAt { get; set; }
 
     public DateTime? UpdatedAt { get; set; }
-
-    public string? CreatedBy { get; set; }
 }

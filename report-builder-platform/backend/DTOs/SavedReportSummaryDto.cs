@@ -1,6 +1,6 @@
-namespace backend.Models;
+namespace backend.DTOs;
 
-public class SavedReport
+public class SavedReportSummaryDto
 {
     public Guid Id { get; set; }
 
@@ -10,11 +10,5 @@ public class SavedReport
 
     public Guid DatasetId { get; set; }
 
-    public string DefinitionJson { get; set; } = string.Empty;
-
     public DateTime CreatedAt { get; set; }
-
-    public DateTime? UpdatedAt { get; set; }
-
-    public string? CreatedBy { get; set; }
 }
