@@ -175,6 +175,7 @@ public class ReportExportService(
         QuestPDF.Settings.License = LicenseType.Community;
 
         var pageSize = ResolvePageSize(exportData.LayoutSettings.PageSize, exportData.LayoutSettings.PageOrientation);
+        var templateKind = ResolveTemplateKind(exportData.LayoutSettings.TemplateId);
 
         return Document.Create(container =>
             {
@@ -185,7 +186,22 @@ public class ReportExportService(
                     page.DefaultTextStyle(style => style.FontSize(10));
 
                     page.Header().Element(header => ComposePdfHeader(header, exportData));
-                    page.Content().Element(content => ComposePdfTable(content, exportData));
+                    page.Content().Element(content =>
+                    {
+                        if (templateKind == ReportTemplateKind.ExecutiveSummary)
+                        {
+                            ComposePdfExecutiveContent(content, exportData);
+                            return;
+                        }
+
+                        if (templateKind == ReportTemplateKind.DetailedReport)
+                        {
+                            ComposePdfDetailedContent(content, exportData);
+                            return;
+                        }
+
+                        ComposePdfTable(content, exportData);
+                    });
                     page.Footer().Element(footer => ComposePdfFooter(footer, exportData.LayoutSettings));
                 });
             })
@@ -233,6 +249,48 @@ public class ReportExportService(
 
     private static void ComposePdfTable(IContainer container, ExportData exportData)
     {
+        ComposePdfTable(container, exportData, includeRowNumbers: false, zebraRows: false, headerBackgroundColor: Colors.Grey.Lighten3);
+    }
+
+    private static void ComposePdfExecutiveContent(IContainer container, ExportData exportData)
+    {
+        container.Column(column =>
+        {
+            column.Spacing(10);
+            column.Item().Row(row =>
+            {
+                row.RelativeItem().Element(card => ComposeMetricCard(card, "Total Rows", exportData.Rows.Count.ToString(CultureInfo.InvariantCulture), "#0f766e"));
+                row.RelativeItem().Element(card => ComposeMetricCard(card, "Columns", exportData.Columns.Count.ToString(CultureInfo.InvariantCulture), "#1d4ed8"));
+                row.RelativeItem().Element(card => ComposeMetricCard(card, "Template", "Executive", "#c2410c"));
+            });
+
+            column.Item().Element(tableHost =>
+                ComposePdfTable(tableHost, exportData, includeRowNumbers: false, zebraRows: true, headerBackgroundColor: Colors.Orange.Lighten3));
+        });
+    }
+
+    private static void ComposePdfDetailedContent(IContainer container, ExportData exportData)
+    {
+        container.Column(column =>
+        {
+            column.Spacing(8);
+            column.Item()
+                .Text("Detailed report format includes row indexing and alternating row bands for easier reading.")
+                .FontSize(9)
+                .FontColor(Colors.Grey.Darken2);
+
+            column.Item().Element(tableHost =>
+                ComposePdfTable(tableHost, exportData, includeRowNumbers: true, zebraRows: true, headerBackgroundColor: Colors.Teal.Lighten3));
+        });
+    }
+
+    private static void ComposePdfTable(
+        IContainer container,
+        ExportData exportData,
+        bool includeRowNumbers,
+        bool zebraRows,
+        string headerBackgroundColor)
+    {
         if (exportData.Columns.Count == 0)
         {
             container.Text("No columns available to export.");
@@ -246,6 +304,11 @@ public class ReportExportService(
             {
                 table.ColumnsDefinition(columns =>
                 {
+                    if (includeRowNumbers)
+                    {
+                        columns.ConstantColumn(28);
+                    }
+
                     foreach (var _ in exportData.Columns)
                     {
                         columns.RelativeColumn();
@@ -254,18 +317,31 @@ public class ReportExportService(
 
                 table.Header(header =>
                 {
+                    if (includeRowNumbers)
+                    {
+                        header.Cell().Element(cell => ComposePdfHeaderCell(cell, headerBackgroundColor)).Text("#").SemiBold();
+                    }
+
                     foreach (var previewColumn in exportData.Columns)
                     {
-                        header.Cell().Element(ComposePdfHeaderCell).Text(previewColumn.DisplayName).SemiBold();
+                        header.Cell().Element(cell => ComposePdfHeaderCell(cell, headerBackgroundColor)).Text(previewColumn.DisplayName).SemiBold();
                     }
                 });
 
-                foreach (var row in exportData.Rows)
+                for (var rowIndex = 0; rowIndex < exportData.Rows.Count; rowIndex++)
                 {
+                    var row = exportData.Rows[rowIndex];
+                    var rowBackground = zebraRows && rowIndex % 2 == 1 ? Colors.Grey.Lighten5 : Colors.White;
+
+                    if (includeRowNumbers)
+                    {
+                        table.Cell().Element(cell => ComposePdfBodyCell(cell, rowBackground)).Text((rowIndex + 1).ToString(CultureInfo.InvariantCulture));
+                    }
+
                     foreach (var previewColumn in exportData.Columns)
                     {
                         row.TryGetValue(previewColumn.FieldName, out var value);
-                        table.Cell().Element(ComposePdfBodyCell).Text(FormatValueForText(value));
+                        table.Cell().Element(cell => ComposePdfBodyCell(cell, rowBackground)).Text(FormatValueForText(value));
                     }
                 }
             });
@@ -313,6 +389,23 @@ public class ReportExportService(
     }
 
     private byte[] BuildExcelDocument(ExportData exportData)
+    {
+        var templateKind = ResolveTemplateKind(exportData.LayoutSettings.TemplateId);
+
+        if (templateKind == ReportTemplateKind.ExecutiveSummary)
+        {
+            return BuildExcelExecutiveDocument(exportData);
+        }
+
+        if (templateKind == ReportTemplateKind.DetailedReport)
+        {
+            return BuildExcelDetailedDocument(exportData);
+        }
+
+        return BuildExcelSimpleDocument(exportData);
+    }
+
+    private byte[] BuildExcelSimpleDocument(ExportData exportData)
     {
         using var workbook = new XLWorkbook();
         var columnCount = Math.Max(1, exportData.Columns.Count);
@@ -393,6 +486,136 @@ public class ReportExportService(
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
         return stream.ToArray();
+    }
+
+    private byte[] BuildExcelExecutiveDocument(ExportData exportData)
+    {
+        using var workbook = new XLWorkbook();
+        var columnCount = Math.Max(1, exportData.Columns.Count);
+        var worksheet = workbook.Worksheets.Add(BuildWorksheetName($"{exportData.LayoutSettings.ReportTitle} Exec"));
+
+        worksheet.Cell(1, 1).Value = exportData.LayoutSettings.ReportTitle;
+        worksheet.Range(1, 1, 1, columnCount).Merge();
+        worksheet.Range(1, 1, 1, columnCount).Style.Font.SetBold();
+        worksheet.Range(1, 1, 1, columnCount).Style.Font.FontSize = 15;
+        worksheet.Range(1, 1, 1, columnCount).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFF2E5");
+
+        if (!string.IsNullOrWhiteSpace(exportData.LayoutSettings.Subtitle))
+        {
+            worksheet.Cell(2, 1).Value = exportData.LayoutSettings.Subtitle;
+            worksheet.Range(2, 1, 2, columnCount).Merge();
+        }
+
+        worksheet.Cell(4, 1).Value = "Total Rows";
+        worksheet.Cell(4, 2).Value = exportData.Rows.Count;
+        worksheet.Cell(5, 1).Value = "Template";
+        worksheet.Cell(5, 2).Value = "Executive Summary";
+
+        var headerRow = 7;
+        WriteExcelTable(worksheet, exportData, headerRow, includeRowNumbers: false, headerColorHex: "#F7D7B5");
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    private byte[] BuildExcelDetailedDocument(ExportData exportData)
+    {
+        using var workbook = new XLWorkbook();
+        var columnCount = Math.Max(1, exportData.Columns.Count + 1);
+        var worksheet = workbook.Worksheets.Add(BuildWorksheetName($"{exportData.LayoutSettings.ReportTitle} Detail"));
+
+        worksheet.Cell(1, 1).Value = exportData.LayoutSettings.ReportTitle;
+        worksheet.Range(1, 1, 1, columnCount).Merge();
+        worksheet.Range(1, 1, 1, columnCount).Style.Font.SetBold();
+        worksheet.Range(1, 1, 1, columnCount).Style.Font.FontSize = 14;
+
+        worksheet.Cell(2, 1).Value = "Detailed Report";
+        worksheet.Range(2, 1, 2, columnCount).Merge();
+        worksheet.Range(2, 1, 2, columnCount).Style.Fill.BackgroundColor = XLColor.FromHtml("#DBF3F1");
+
+        var headerRow = 5;
+        WriteExcelTable(worksheet, exportData, headerRow, includeRowNumbers: true, headerColorHex: "#BFE8EE");
+        worksheet.SheetView.FreezeRows(headerRow);
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    private static void WriteExcelTable(
+        IXLWorksheet worksheet,
+        ExportData exportData,
+        int headerRow,
+        bool includeRowNumbers,
+        string headerColorHex)
+    {
+        var columnCount = Math.Max(1, exportData.Columns.Count + (includeRowNumbers ? 1 : 0));
+        var nextColumn = 1;
+
+        if (includeRowNumbers)
+        {
+            worksheet.Cell(headerRow, nextColumn).Value = "#";
+            nextColumn++;
+        }
+
+        foreach (var previewColumn in exportData.Columns)
+        {
+            worksheet.Cell(headerRow, nextColumn).Value = previewColumn.DisplayName;
+            nextColumn++;
+        }
+
+        var headerRange = worksheet.Range(headerRow, 1, headerRow, columnCount);
+        headerRange.Style.Font.SetBold();
+        headerRange.Style.Fill.SetBackgroundColor(XLColor.FromHtml(headerColorHex));
+        headerRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+        headerRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+
+        var dataStartRow = headerRow + 1;
+        for (var rowIndex = 0; rowIndex < exportData.Rows.Count; rowIndex++)
+        {
+            var currentRowNumber = dataStartRow + rowIndex;
+            var row = exportData.Rows[rowIndex];
+            var dataColumn = 1;
+
+            if (includeRowNumbers)
+            {
+                worksheet.Cell(currentRowNumber, dataColumn).Value = rowIndex + 1;
+                dataColumn++;
+            }
+
+            foreach (var previewColumn in exportData.Columns)
+            {
+                row.TryGetValue(previewColumn.FieldName, out var value);
+                worksheet.Cell(currentRowNumber, dataColumn).Value = FormatValueForCell(value);
+                dataColumn++;
+            }
+        }
+
+        var dataEndRow = dataStartRow + Math.Max(0, exportData.Rows.Count - 1);
+        if (exportData.Rows.Count > 0)
+        {
+            var tableRange = worksheet.Range(headerRow, 1, dataEndRow, columnCount);
+            tableRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            tableRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+        }
+
+        var noteRow = Math.Max(dataEndRow + 2, dataStartRow + 1);
+        if (exportData.IsTruncated)
+        {
+            worksheet.Cell(noteRow, 1).Value =
+                $"Results truncated to the first {exportData.AppliedRowLimit} rows due to dataset execution limits.";
+            worksheet.Range(noteRow, 1, noteRow, columnCount).Merge();
+            noteRow++;
+        }
+
+        if (!string.IsNullOrWhiteSpace(exportData.LayoutSettings.FooterText))
+        {
+            worksheet.Cell(noteRow, 1).Value = exportData.LayoutSettings.FooterText;
+            worksheet.Range(noteRow, 1, noteRow, columnCount).Merge();
+        }
+
+        worksheet.Columns(1, columnCount).AdjustToContents();
     }
 
     private async Task<byte[]?> TryLoadLogoImageBytesAsync(string? logoUrl, CancellationToken cancellationToken)
@@ -476,21 +699,36 @@ public class ReportExportService(
         return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
     }
 
-    private static IContainer ComposePdfHeaderCell(IContainer container)
+    private static void ComposeMetricCard(IContainer container, string label, string value, string colorHex)
+    {
+        container
+            .Border(1)
+            .BorderColor(Colors.Grey.Lighten2)
+            .Background(colorHex)
+            .Padding(6)
+            .Column(column =>
+            {
+                column.Item().Text(label).FontSize(8).FontColor(Colors.White);
+                column.Item().Text(value).FontSize(14).SemiBold().FontColor(Colors.White);
+            });
+    }
+
+    private static IContainer ComposePdfHeaderCell(IContainer container, string backgroundColor)
     {
         return container
             .Border(1)
             .BorderColor(Colors.Grey.Lighten1)
-            .Background(Colors.Grey.Lighten3)
+            .Background(backgroundColor)
             .PaddingVertical(5)
             .PaddingHorizontal(6);
     }
 
-    private static IContainer ComposePdfBodyCell(IContainer container)
+    private static IContainer ComposePdfBodyCell(IContainer container, string backgroundColor)
     {
         return container
             .Border(1)
             .BorderColor(Colors.Grey.Lighten2)
+            .Background(backgroundColor)
             .PaddingVertical(4)
             .PaddingHorizontal(6);
     }
@@ -567,6 +805,16 @@ public class ReportExportService(
         return value;
     }
 
+    private static ReportTemplateKind ResolveTemplateKind(string templateId)
+    {
+        return templateId.Trim().ToLowerInvariant() switch
+        {
+            "executive-summary" => ReportTemplateKind.ExecutiveSummary,
+            "detailed-report" => ReportTemplateKind.DetailedReport,
+            _ => ReportTemplateKind.SimpleTable
+        };
+    }
+
     private sealed record ExportData(
         IReadOnlyList<PreviewColumnDto> Columns,
         List<Dictionary<string, object?>> Rows,
@@ -587,4 +835,11 @@ public class ReportExportService(
         string PageSize,
         bool ShowGeneratedDate,
         bool ShowPageNumbers);
+
+    private enum ReportTemplateKind
+    {
+        SimpleTable,
+        ExecutiveSummary,
+        DetailedReport
+    }
 }

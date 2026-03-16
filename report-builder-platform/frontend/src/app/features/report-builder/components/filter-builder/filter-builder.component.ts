@@ -106,10 +106,11 @@ export class FilterBuilderComponent {
   }
 
   protected onOperatorChanged(filterId: string, selectedOperator: string | null | undefined): void {
+    const nextOperator = selectedOperator ?? '';
     this.updateFilter(filterId, (currentFilter) => ({
       ...currentFilter,
-      operator: selectedOperator ?? '',
-      value: createDefaultValue(currentFilter.dataType, selectedOperator ?? '')
+      operator: nextOperator,
+      value: this.resolveValueForOperatorChange(currentFilter, nextOperator)
     }));
   }
 
@@ -350,5 +351,61 @@ export class FilterBuilderComponent {
     const parsedDate = new Date(year, month - 1, day);
     this.isoDateCache.set(value, parsedDate);
     return parsedDate;
+  }
+
+  private resolveValueForOperatorChange(filter: FilterDefinition, nextOperator: string): FilterDefinition['value'] {
+    if (!nextOperator || !requiresValue(nextOperator)) {
+      return null;
+    }
+
+    const currentOperator = filter.operator;
+    if (!currentOperator || !requiresValue(currentOperator)) {
+      return createDefaultValue(filter.dataType, nextOperator);
+    }
+
+    const nextIsBetween = isBetweenOperator(nextOperator);
+    const currentIsBetween = isBetweenOperator(currentOperator);
+    if (nextIsBetween !== currentIsBetween) {
+      return createDefaultValue(filter.dataType, nextOperator);
+    }
+
+    const dataType = normalizeDataType(filter.dataType);
+    if (nextIsBetween) {
+      if (dataType === 'number' && this.isNumberRangeValue(filter.value)) {
+        return filter.value;
+      }
+
+      if (dataType === 'date' && this.isDateRangeValue(filter.value)) {
+        return filter.value;
+      }
+
+      return createDefaultValue(filter.dataType, nextOperator);
+    }
+
+    if (dataType === 'string' && typeof filter.value === 'string') {
+      return filter.value;
+    }
+
+    if (dataType === 'number' && typeof filter.value === 'number') {
+      return filter.value;
+    }
+
+    if (dataType === 'date' && typeof filter.value === 'string') {
+      return filter.value;
+    }
+
+    if (dataType === 'boolean' && typeof filter.value === 'boolean') {
+      return filter.value;
+    }
+
+    return createDefaultValue(filter.dataType, nextOperator);
+  }
+
+  private isNumberRangeValue(value: FilterDefinition['value']): value is NumberRangeValue {
+    return typeof value === 'object' && value !== null && 'min' in value && 'max' in value;
+  }
+
+  private isDateRangeValue(value: FilterDefinition['value']): value is DateRangeValue {
+    return typeof value === 'object' && value !== null && 'start' in value && 'end' in value;
   }
 }

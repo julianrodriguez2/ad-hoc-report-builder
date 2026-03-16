@@ -608,14 +608,20 @@ export class ReportBuilderPageComponent implements OnInit {
 
   private buildExportFileName(extension: 'pdf' | 'xlsx'): string {
     const reportTitle = this.reportDefinition.layoutSettings.reportTitle || 'report';
+    const templateId = this.reportDefinition.layoutSettings.templateId || 'template';
     const normalizedTitle = reportTitle
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    const normalizedTemplate = templateId
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
     const baseName = normalizedTitle || 'report';
     const currentDate = new Date().toISOString().slice(0, 10);
-    return `${baseName}-${currentDate}.${extension}`;
+    return `${baseName}-${normalizedTemplate || 'template'}-${currentDate}.${extension}`;
   }
 
   private async applyExportErrorState(error: unknown, fallbackTitle: string): Promise<void> {

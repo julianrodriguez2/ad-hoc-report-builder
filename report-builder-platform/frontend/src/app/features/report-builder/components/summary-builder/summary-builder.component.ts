@@ -192,7 +192,7 @@ export class SummaryBuilderComponent implements OnChanges {
   }
 
   protected trackBySummary(index: number, summary: SummaryDefinition): string {
-    return `${summary.fieldName}:${summary.alias}:${index}`;
+    return `${index}`;
   }
 
   protected trackByFieldName(_: number, field: Field): string {
