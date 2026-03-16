@@ -191,13 +191,28 @@ export class ReportBuilderPageComponent implements OnInit {
   }
 
   protected onGroupingChanged(grouping: GroupDefinition[]): void {
-    const shouldClearSummaries = grouping.length === 0;
+    if (grouping.length > 0) {
+      // Backend requires selectedFields to exactly match grouping fields — sync automatically
+      const syncedFields = grouping
+        .map((g) => this.availableFields.find((f) => f.fieldName === g.fieldName))
+        .filter((f): f is Field => f !== undefined);
 
-    this.reportDefinition = {
-      ...this.reportDefinition,
-      grouping,
-      summaries: shouldClearSummaries ? [] : this.reportDefinition.summaries
-    };
+      this.selectedFields = syncedFields;
+      this.reportDefinition = {
+        ...this.reportDefinition,
+        fields: syncedFields.map((f) => ({ fieldName: f.fieldName, displayName: f.displayName })),
+        grouping,
+        summaries: this.reportDefinition.summaries
+      };
+    } else {
+      this.selectedFields = [];
+      this.reportDefinition = {
+        ...this.reportDefinition,
+        fields: [],
+        grouping: [],
+        summaries: []
+      };
+    }
   }
 
   protected onSummariesChanged(summaries: SummaryDefinition[]): void {

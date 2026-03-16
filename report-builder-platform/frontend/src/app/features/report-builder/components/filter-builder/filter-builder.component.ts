@@ -53,6 +53,8 @@ export class FilterBuilderComponent {
     { label: 'False', value: false }
   ];
 
+  private readonly isoDateCache = new Map<string, Date>();
+
   protected addFilter(): void {
     if (!this.hasFilterableFields()) {
       return;
@@ -139,20 +141,30 @@ export class FilterBuilderComponent {
   }
 
   protected onDateValueChanged(filterId: string, value: Date | null): void {
-    this.updateFilter(filterId, (currentFilter) => ({
-      ...currentFilter,
-      value: this.dateToIsoString(value)
+    const newIsoString = this.dateToIsoString(value);
+    const currentFilter = this.filters.find((f) => f.id === filterId);
+    const currentIsoString = typeof currentFilter?.value === 'string' ? currentFilter.value : null;
+    if (currentIsoString === newIsoString) {
+      return;
+    }
+    this.updateFilter(filterId, (filter) => ({
+      ...filter,
+      value: newIsoString
     }));
   }
 
   protected onDateRangeValueChanged(filterId: string, key: keyof DateRangeValue, value: Date | null): void {
+    const newIsoString = this.dateToIsoString(value);
     this.updateFilter(filterId, (currentFilter) => {
       const currentRange = this.getDateRangeValue(currentFilter);
+      if (currentRange[key] === newIsoString) {
+        return currentFilter;
+      }
       return {
         ...currentFilter,
         value: {
           ...currentRange,
-          [key]: this.dateToIsoString(value)
+          [key]: newIsoString
         }
       };
     });
@@ -250,8 +262,20 @@ export class FilterBuilderComponent {
   }
 
   private updateFilter(filterId: string, update: (filter: FilterDefinition) => FilterDefinition): void {
-    const nextFilters = this.filters.map((filter) => (filter.id === filterId ? update(filter) : filter));
-    this.emitFilters(nextFilters);
+    let changed = false;
+    const nextFilters = this.filters.map((filter) => {
+      if (filter.id !== filterId) {
+        return filter;
+      }
+      const updated = update(filter);
+      if (updated !== filter) {
+        changed = true;
+      }
+      return updated;
+    });
+    if (changed) {
+      this.emitFilters(nextFilters);
+    }
   }
 
   private emitFilters(filters: FilterDefinition[]): void {
@@ -312,12 +336,19 @@ export class FilterBuilderComponent {
       return null;
     }
 
+    const cachedDate = this.isoDateCache.get(value);
+    if (cachedDate) {
+      return cachedDate;
+    }
+
     const parts = value.split('-').map((part) => Number(part));
     if (parts.length !== 3 || parts.some((part) => Number.isNaN(part))) {
       return null;
     }
 
     const [year, month, day] = parts;
-    return new Date(year, month - 1, day);
+    const parsedDate = new Date(year, month - 1, day);
+    this.isoDateCache.set(value, parsedDate);
+    return parsedDate;
   }
 }

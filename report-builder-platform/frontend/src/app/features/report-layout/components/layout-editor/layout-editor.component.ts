@@ -52,6 +52,10 @@ export class LayoutEditorComponent implements OnChanges {
       [property]: value
     };
 
-    this.layoutSettingsChanged.emit({ ...this.draftLayoutSettings });
+    // Always merge against the authoritative layoutSettings input to ensure templateId is never lost
+    this.layoutSettingsChanged.emit({
+      ...normalizeLayoutSettings(this.layoutSettings),
+      ...this.draftLayoutSettings
+    });
   }
 }
