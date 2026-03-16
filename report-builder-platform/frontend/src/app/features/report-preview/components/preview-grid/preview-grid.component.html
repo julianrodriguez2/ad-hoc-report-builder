@@ -15,11 +15,15 @@
     </div>
   } @else if (!hasAttemptedPreview) {
     <div class="state-container">
-      <p>Build your report and click Run Preview to see results.</p>
+      <i class="pi pi-table state-icon"></i>
+      <p class="state-title">No preview loaded</p>
+      <p class="state-hint">Configure your report in the left panel, then click <strong>Run Preview</strong>.</p>
     </div>
   } @else if (rows.length === 0) {
     <div class="state-container">
-      <p>No rows returned for the current preview.</p>
+      <i class="pi pi-inbox state-icon"></i>
+      <p class="state-title">No results found</p>
+      <p class="state-hint">No rows were returned for the current report configuration.</p>
     </div>
   } @else {
     @if (isTruncated) {

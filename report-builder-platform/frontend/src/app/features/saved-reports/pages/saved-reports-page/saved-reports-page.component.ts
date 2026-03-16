@@ -36,6 +36,10 @@ export class SavedReportsPageComponent implements OnInit {
     this.loadData();
   }
 
+  protected goToBuilder(): void {
+    this.router.navigate(['/report-builder']);
+  }
+
   protected loadReport(reportId: string): void {
     this.router.navigate(['/report-builder'], {
       queryParams: { savedReportId: reportId }

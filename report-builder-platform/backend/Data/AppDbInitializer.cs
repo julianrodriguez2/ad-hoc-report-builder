@@ -273,7 +273,7 @@ public static class AppDbInitializer
                             uniqueidentifier,
                             CASE WHEN ISJSON(DefinitionJson) = 1 THEN JSON_VALUE(DefinitionJson, '$.datasetId') END),
                         '00000000-0000-0000-0000-000000000000'),
-                    ISNULL(NULLIF(DefinitionJson, ''), '{}'),
+                    ISNULL(NULLIF(DefinitionJson, ''), '{{}}'),
                     ISNULL(CreatedAt, SYSUTCDATETIME()),
                     NULL,
                     NULLIF(CreatedBy, '')

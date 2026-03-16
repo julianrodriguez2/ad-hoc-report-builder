@@ -1,10 +1,10 @@
 .report-builder-page {
-  height: 100vh;
+  height: calc(100vh - 3.5rem);
   padding: 1rem;
 }
 
 :host ::ng-deep .full-height-splitter {
-  height: calc(100vh - 2rem);
+  height: calc(100vh - 3.5rem - 2rem);
   border: 1px solid #d8e1ee;
   border-radius: 10px;
 }
@@ -13,7 +13,8 @@
 .right-panel,
 .center-panel {
   height: 100%;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.75rem;
 }
 
@@ -102,6 +103,27 @@
   gap: 0.45rem;
 }
 
+.toolbar-divider {
+  width: 1px;
+  height: 1.5rem;
+  background: #e2e8f0;
+  flex-shrink: 0;
+}
+
+.active-report-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #334155;
+
+  i {
+    color: #64748b;
+    font-size: 0.8rem;
+  }
+}
+
 app-preview-grid {
   flex: 1;
   min-height: 0;
@@ -141,6 +163,7 @@ app-preview-grid {
 @media (max-width: 1024px) {
   .report-builder-page {
     height: auto;
+    min-height: calc(100vh - 3.5rem);
   }
 
   :host ::ng-deep .full-height-splitter {

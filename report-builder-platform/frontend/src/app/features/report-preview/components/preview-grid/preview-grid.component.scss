@@ -26,6 +26,26 @@
   text-align: center;
 }
 
+.state-icon {
+  font-size: 2.75rem;
+  color: #cbd5e1;
+  margin-bottom: 0.25rem;
+}
+
+.state-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.state-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #94a3b8;
+  max-width: 280px;
+}
+
 .error-state {
   align-items: stretch;
   text-align: left;

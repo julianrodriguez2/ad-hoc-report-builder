@@ -1,1 +1,21 @@
-<router-outlet></router-outlet>
+<header class="app-header">
+  <a class="app-brand" routerLink="/report-builder">
+    <i class="pi pi-chart-bar"></i>
+    <span>ReportBuilder</span>
+  </a>
+
+  <nav class="app-nav">
+    <a routerLink="/report-builder" routerLinkActive="is-active" class="nav-link">
+      <i class="pi pi-sliders-h"></i>
+      <span>Builder</span>
+    </a>
+    <a routerLink="/saved-reports" routerLinkActive="is-active" class="nav-link">
+      <i class="pi pi-folder-open"></i>
+      <span>Saved Reports</span>
+    </a>
+  </nav>
+</header>
+
+<main class="app-main">
+  <router-outlet></router-outlet>
+</main>

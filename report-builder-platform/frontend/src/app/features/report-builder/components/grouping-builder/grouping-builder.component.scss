@@ -26,9 +26,9 @@
 }
 
 .grouping-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
 }
 
 .grouping-column {
@@ -36,7 +36,7 @@
   border-radius: 8px;
   padding: 0.6rem;
   background: #f8fbff;
-  min-height: 8rem;
+  min-height: 4rem;
 }
 
 .column-title {
@@ -89,7 +89,8 @@
 }
 
 .direction-dropdown {
-  width: 8.5rem;
+  width: 7rem;
+  flex-shrink: 0;
 }
 
 .empty-state {
@@ -104,8 +105,3 @@
   color: #64748b;
 }
 
-@media (max-width: 900px) {
-  .grouping-grid {
-    grid-template-columns: 1fr;
-  }
-}

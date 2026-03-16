@@ -43,29 +43,42 @@
           } @else {
             @for (summary of selectedSummaries; track trackBySummary($index, summary)) {
               <div class="summary-row" cdkDrag>
-                <span class="drag-handle" cdkDragHandle>
-                  <i class="pi pi-bars"></i>
-                </span>
+                <div class="summary-row-top">
+                  <span class="drag-handle" cdkDragHandle>
+                    <i class="pi pi-bars"></i>
+                  </span>
 
-                <p-dropdown
-                  [options]="aggregationOptions(summary)"
-                  optionLabel="label"
-                  optionValue="value"
-                  [ngModel]="summary.aggregation"
-                  appendTo="body"
-                  styleClass="aggregation-dropdown"
-                  (onChange)="onAggregationChanged($index, $event.value)"
-                ></p-dropdown>
+                  <p-dropdown
+                    [options]="aggregationOptions(summary)"
+                    optionLabel="label"
+                    optionValue="value"
+                    [ngModel]="summary.aggregation"
+                    appendTo="body"
+                    styleClass="aggregation-dropdown"
+                    (onChange)="onAggregationChanged($index, $event.value)"
+                  ></p-dropdown>
 
-                <p-dropdown
-                  [options]="fieldOptions()"
-                  optionLabel="label"
-                  optionValue="value"
-                  [ngModel]="summary.fieldName"
-                  appendTo="body"
-                  styleClass="field-dropdown"
-                  (onChange)="onFieldChanged($index, $event.value)"
-                ></p-dropdown>
+                  <p-dropdown
+                    [options]="fieldOptions()"
+                    optionLabel="label"
+                    optionValue="value"
+                    [ngModel]="summary.fieldName"
+                    appendTo="body"
+                    styleClass="field-dropdown"
+                    (onChange)="onFieldChanged($index, $event.value)"
+                  ></p-dropdown>
+
+                  <button
+                    pButton
+                    type="button"
+                    icon="pi pi-times"
+                    text
+                    rounded
+                    severity="secondary"
+                    aria-label="Remove summary"
+                    (click)="removeSummary($index)"
+                  ></button>
+                </div>
 
                 <input
                   pInputText
@@ -75,17 +88,6 @@
                   placeholder="Alias"
                   (ngModelChange)="onAliasChanged($index, $event)"
                 />
-
-                <button
-                  pButton
-                  type="button"
-                  icon="pi pi-times"
-                  text
-                  rounded
-                  severity="secondary"
-                  aria-label="Remove summary"
-                  (click)="removeSummary($index)"
-                ></button>
               </div>
 
               @if (aliasValidationMessage($index); as aliasError) {

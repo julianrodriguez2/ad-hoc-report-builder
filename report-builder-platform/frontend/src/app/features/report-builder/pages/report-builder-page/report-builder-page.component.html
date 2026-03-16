@@ -74,6 +74,12 @@
       <div class="center-panel">
         <div class="preview-toolbar">
           <div class="toolbar-left">
+            @if (activeSavedReportName) {
+              <div class="active-report-label">
+                <i class="pi pi-file-o"></i>
+                <span>{{ activeSavedReportName }}</span>
+              </div>
+            }
             @if (saveSuccessMessage) {
               <p-message severity="success" [text]="saveSuccessMessage"></p-message>
             }
@@ -86,22 +92,14 @@
             <button
               pButton
               type="button"
-              label="Saved Reports"
-              icon="pi pi-folder-open"
-              severity="secondary"
-              [text]="true"
-              routerLink="/saved-reports"
-            ></button>
-
-            <button
-              pButton
-              type="button"
               label="Save Report"
               icon="pi pi-save"
               severity="secondary"
               [disabled]="!reportDefinition.datasetId || saveSubmitting"
               (click)="openSaveDialog()"
             ></button>
+
+            <div class="toolbar-divider"></div>
 
             <button
               pButton
@@ -124,6 +122,8 @@
               [disabled]="previewLoading || !!exportLoading"
               (click)="exportExcel()"
             ></button>
+
+            <div class="toolbar-divider"></div>
 
             <button
               pButton

@@ -25,32 +25,47 @@
     <div class="filter-list">
       @for (filter of filters; track trackByFilterId($index, filter)) {
         <div class="filter-row">
-          <div class="control field-control">
-            <label>Field</label>
-            <p-dropdown
-              [options]="fieldOptions()"
-              optionLabel="label"
-              optionValue="value"
-              [showClear]="true"
-              [ngModel]="filter.fieldName || null"
-              placeholder="Select field"
-              appendTo="body"
-              (onChange)="onFieldChanged(filter.id, $event.value ?? null)"
-            ></p-dropdown>
-          </div>
+          <div class="filter-top-row">
+            <div class="control field-control">
+              <label>Field</label>
+              <p-dropdown
+                [options]="fieldOptions()"
+                optionLabel="label"
+                optionValue="value"
+                [showClear]="true"
+                [ngModel]="filter.fieldName || null"
+                placeholder="Select field"
+                appendTo="body"
+                (onChange)="onFieldChanged(filter.id, $event.value ?? null)"
+              ></p-dropdown>
+            </div>
 
-          <div class="control operator-control">
-            <label>Operator</label>
-            <p-dropdown
-              [options]="operatorOptions(filter)"
-              optionLabel="label"
-              optionValue="value"
-              [ngModel]="filter.operator || null"
-              [disabled]="operatorDisabled(filter)"
-              placeholder="Select operator"
-              appendTo="body"
-              (onChange)="onOperatorChanged(filter.id, $event.value ?? null)"
-            ></p-dropdown>
+            <div class="control operator-control">
+              <label>Operator</label>
+              <p-dropdown
+                [options]="operatorOptions(filter)"
+                optionLabel="label"
+                optionValue="value"
+                [ngModel]="filter.operator || null"
+                [disabled]="operatorDisabled(filter)"
+                placeholder="Select operator"
+                appendTo="body"
+                (onChange)="onOperatorChanged(filter.id, $event.value ?? null)"
+              ></p-dropdown>
+            </div>
+
+            <div class="remove-control">
+              <button
+                pButton
+                type="button"
+                icon="pi pi-times"
+                text
+                rounded
+                severity="secondary"
+                aria-label="Remove filter"
+                (click)="removeFilter(filter.id)"
+              ></button>
+            </div>
           </div>
 
           <div class="control value-control">
@@ -142,19 +157,6 @@
                 (onChange)="onBooleanValueChanged(filter.id, $event.value ?? null)"
               ></p-dropdown>
             }
-          </div>
-
-          <div class="remove-control">
-            <button
-              pButton
-              type="button"
-              icon="pi pi-times"
-              text
-              rounded
-              severity="secondary"
-              aria-label="Remove filter"
-              (click)="removeFilter(filter.id)"
-            ></button>
           </div>
         </div>
       }

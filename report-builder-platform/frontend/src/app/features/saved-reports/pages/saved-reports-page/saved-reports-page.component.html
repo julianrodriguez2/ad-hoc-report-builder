@@ -1,5 +1,13 @@
 <section class="saved-reports-page">
-  <p-card header="Saved Reports">
+  <div class="page-header">
+    <div class="page-title-area">
+      <h1 class="page-title">Saved Reports</h1>
+      <p class="page-subtitle">Manage and run your saved report configurations.</p>
+    </div>
+    <button pButton type="button" label="New Report" icon="pi pi-plus" (click)="goToBuilder()"></button>
+  </div>
+
+  <p-card>
     @if (errorMessage) {
       <p-message severity="error" [text]="errorMessage"></p-message>
     }
